@@ -299,6 +299,17 @@
   .chat-input-row input{ flex:1; margin:0; }
   .chat-input-row button{ background:var(--navy); color:#fff; border:none; border-radius:var(--radius); padding:0 14px; font-size:13px; font-weight:600;}
 
+  /* ---------- WHATSAPP ---------- */
+  .wa-btn{
+    display:inline-flex; align-items:center; gap:8px; background:#25D366; color:#fff; border:none;
+    padding:12px 20px; font-size:14px; font-weight:600; border-radius:var(--radius); text-decoration:none; cursor:pointer;
+  }
+  .wa-btn:hover{ filter:brightness(0.95); }
+  .wa-btn svg{ width:18px; height:18px; fill:currentColor; }
+  .contact-bar{ display:flex; align-items:center; gap:12px; margin-top:18px; flex-wrap:wrap; }
+  .contact-bar .ph{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--muted); }
+  .checkout-wa{ margin-top:10px; }
+
   /* ---------- LOGIN GATE ---------- */
   .login-shell{ max-width:400px; margin:70px auto; text-align:center; }
   .login-shell img{ height:70px; margin-bottom:18px;}
@@ -335,6 +346,7 @@
           <button class="btn-primary" id="heroShop">Voir la collection</button>
           <button class="btn-ghost" data-view="admin">Espace équipe →</button>
         </div>
+        <div class="contact-bar" id="contactBar" style="display:none;"></div>
       </div>
       <div class="hero-tag">
         <div class="stamp-sub">JODA · N°01</div>
@@ -549,6 +561,23 @@
         </div>
       </div>
 
+      <div id="tab-reglages" class="tab-content" style="display:none;">
+        <div class="panel" style="max-width:520px;">
+          <h4>Numéro WhatsApp de la boutique</h4>
+          <p class="section-note" style="margin-bottom:12px;">Format international sans le "+" ni espaces. Exemple pour la Guinée : 224620000000. Ce numéro reçoit les confirmations de commande et s'affiche sur la boutique.</p>
+          <input class="text-input" id="setWhatsapp" placeholder="224614307557">
+          <button class="btn-mini" id="saveWhatsappBtn">Enregistrer le numéro</button>
+          <div class="status-msg" id="whatsappMsg"></div>
+        </div>
+        <div class="panel" style="max-width:520px;">
+          <h4>Réinitialiser l'historique des ventes</h4>
+          <p class="section-note" style="margin-bottom:12px;">Efface toutes les commandes passées (par exemple en fin d'année ou pour repartir à zéro), mais conserve un résumé statistique cumulé : nombre total de ventes, chiffre d'affaires total, et total vendu par article. Les produits, l'équipe et les dépenses ne sont pas touchés.</p>
+          <div id="archiveSummary" class="report-box" style="display:block;margin-bottom:14px;"></div>
+          <button class="btn-mini danger" id="resetSalesBtn">Réinitialiser les ventes maintenant</button>
+          <div class="status-msg" id="resetMsg"></div>
+        </div>
+      </div>
+
       <div id="tab-monprofil" class="tab-content" style="display:none;">
         <div class="panel" style="max-width:420px;">
           <h4>Mon profil</h4>
@@ -565,7 +594,7 @@
   </div>
 </main>
 
-<footer> @ 2026-Joda Boutique · L'excellence dans la qualité</footer>
+<footer>Joda Boutique · L'excellence dans la qualité</footer>
 
 <!-- CART DRAWER -->
 <div class="overlay" id="overlay"></div>
@@ -646,6 +675,8 @@
   let likes = {};
   let traffic = {};
   let expenses = [];
+  let settings = {}; // numéro whatsapp, etc.
+  let salesArchive = {count:0, revenue:0, byProduct:{}}; // résumé conservé après réinitialisation
   let sessionLikes = {}; // pour limiter à 1 j'aime par pièce et par visite
 
   const SUPABASE_URL = 'https://yohamnvnvasybwwanfsl.supabase.co';
@@ -710,8 +741,11 @@
     likes = (await storageGet('joda_likes', true)) || {};
     traffic = (await storageGet('joda_traffic', true)) || {};
     expenses = (await storageGet('joda_expenses', true)) || [];
+    settings = (await storageGet('joda_settings', true)) || {whatsapp:''};
+    salesArchive = (await storageGet('joda_sales_archive', true)) || {count:0, revenue:0, byProduct:{}};
 
     await trackVisit();
+    renderContactBar();
 
     renderStore();
     renderCarousel();
@@ -736,6 +770,24 @@
     if(!traffic[k]) traffic[k] = {visits:0, clicks:0};
     traffic[k].clicks++;
     await storageSet('joda_traffic', traffic, true);
+  }
+
+  /* ---------- WHATSAPP HELPERS ---------- */
+  const WA_ICON = '<svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 00-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1012 2z"/></svg>';
+  function waNumber(){ return (settings.whatsapp||'').replace(/[^0-9]/g,''); }
+  function waLink(message){
+    const num = waNumber();
+    const txt = encodeURIComponent(message||'');
+    return num ? `https://wa.me/${num}?text=${txt}` : '';
+  }
+  function renderContactBar(){
+    const bar = document.getElementById('contactBar');
+    const num = waNumber();
+    if(!num){ bar.style.display='none'; return; }
+    bar.style.display='flex';
+    bar.innerHTML = `
+      <a class="wa-btn" href="${waLink('Bonjour Joda Boutique, je vous contacte depuis votre site.')}" target="_blank" rel="noopener">${WA_ICON} Nous contacter sur WhatsApp</a>
+      <span class="ph">${escapeHtml(settings.whatsapp)}</span>`;
   }
 
   /* ---------- IMAGE HELPER ---------- */
@@ -961,9 +1013,17 @@
     cart = {};
     renderCart(); renderStore(); renderCarousel();
     if(currentUser) renderLoggedArea();
-    msg.textContent = 'Commande envoyée ! Merci ' + name + '.';
+
+    // Message de confirmation + bouton WhatsApp vers la boutique
+    const recap = 'Bonjour Joda Boutique !%0AJe viens de passer une commande :%0A'
+      + items.map(it=>`- ${it.name} x${it.qty}`).join('%0A')
+      + `%0ATotal : ${money(total)}`
+      + `%0ANom : ${name}` + (phone ? `%0ATéléphone : ${phone}` : '');
+    const waHref = waLink(decodeURIComponent(recap));
+    msg.innerHTML = 'Commande envoyée ! Merci ' + escapeHtml(name) + '.'
+      + (waHref ? `<div class="checkout-wa"><a class="wa-btn" href="${waHref}" target="_blank" rel="noopener">${WA_ICON} Confirmer sur WhatsApp</a></div>` : '');
     document.getElementById('custName').value=''; document.getElementById('custPhone').value='';
-    setTimeout(()=>{ msg.textContent=''; closeDrawer(); }, 2200);
+    setTimeout(()=>{ if(!waHref){ msg.textContent=''; closeDrawer(); } }, 4000);
   });
 
   /* ---------- NAV / VIEWS ---------- */
@@ -1013,7 +1073,8 @@
       {key:'finances', label:'Finances'},
       {key:'produits', label:'Produits'},
       {key:'commandes', label:'Commandes'},
-      {key:'equipe', label:'Équipe'}
+      {key:'equipe', label:'Équipe'},
+      {key:'reglages', label:'Réglages'}
     ];
     return [
       {key:'mystats', label:'Mes statistiques'},
@@ -1031,14 +1092,14 @@
     const tabs = tabsForRole(currentUser.role);
     const tabsEl = document.getElementById('adminTabs');
     tabsEl.innerHTML = tabs.map((t,i)=>`<button class="admin-tab ${i===0?'active':''}" data-tab="${t.key}">${t.label}</button>`).join('');
-    ['overview','stats','finances','produits','commandes','equipe','monprofil','mystats'].forEach(k=>{
+    ['overview','stats','finances','produits','commandes','equipe','monprofil','mystats','reglages'].forEach(k=>{
       document.getElementById('tab-'+k).style.display = (tabs[0].key===k) ? '' : 'none';
     });
     tabsEl.querySelectorAll('.admin-tab').forEach(tab=>{
       tab.addEventListener('click', ()=>{
         tabsEl.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
         tab.classList.add('active');
-        ['overview','stats','finances','produits','commandes','equipe','monprofil','mystats'].forEach(k=>{
+        ['overview','stats','finances','produits','commandes','equipe','monprofil','mystats','reglages'].forEach(k=>{
           document.getElementById('tab-'+k).style.display = (tab.dataset.tab===k) ? '' : 'none';
         });
       });
@@ -1049,7 +1110,7 @@
     document.getElementById('ordersTitle').textContent = currentUser.role==='admin' ? 'Toutes les commandes' : 'Commandes disponibles et en cours';
     document.getElementById('addedByHeadCell').style.display = currentUser.role==='admin' ? '' : 'none';
 
-    if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); }
+    if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); }
     renderProductsTab();
     renderOrdersTab();
     if(currentUser.role==='admin') renderTeamTab();
@@ -1123,9 +1184,13 @@
     barChart(document.getElementById('weeklySales'),
       Object.entries(weekMap).map(([label,v])=>({label, value:v.qty})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
 
+    // meilleures ventes = commandes actuelles + archive cumulée
     const allMap = soldQuantities(null);
+    const combined = {};
+    Object.entries(allMap).forEach(([n,v])=>{ combined[n] = (combined[n]||0) + v.qty; });
+    Object.entries(salesArchive.byProduct||{}).forEach(([n,q])=>{ combined[n] = (combined[n]||0) + q; });
     barChart(document.getElementById('topSellers'),
-      Object.entries(allMap).map(([label,v])=>({label, value:v.qty})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
+      Object.entries(combined).map(([label,value])=>({label, value})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
 
     const likeEntries = Object.entries(likes).map(([pid,count])=>{
       const p = products.find(x=>x.id===pid);
@@ -1522,11 +1587,17 @@ Données du mois (${monthLabel(Date.now())}) :
       if(o.status==='en cours' && (isAdmin || o.claimedBy===currentUser.id)){
         actionBtns += `<button class="btn-mini" data-act="done" data-id="${o.id}">Marquer traitée</button>`;
       }
+      if((isAdmin || o.claimedBy===currentUser.id) && o.status!=='traitée'){
+        actionBtns += `<button class="btn-mini" data-act="adjust" data-id="${o.id}">Ajuster prix</button>`;
+      }
+      const totalCell = (o.originalTotal && o.originalTotal!==o.total)
+        ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
+        : money(o.total);
       return `<tr>
         <td>${o.date}</td>
         <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}</td>
         <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}</td>
-        <td>${money(o.total)}</td>
+        <td>${totalCell}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
         <td>${o.claimedBy ? escapeHtml(teamName(o.claimedBy)) : '—'}</td>
         <td>${actionBtns}</td>
@@ -1541,9 +1612,17 @@ Données du mois (${monthLabel(Date.now())}) :
         } else if(btn.dataset.act==='done'){
           o.status='traitée';
           await logActivity(currentUser.name, 'a marqué traitée la commande de '+o.customer);
+        } else if(btn.dataset.act==='adjust'){
+          const nv = prompt('Prix de vente final pour la commande de '+o.customer+' (le client a peut-être négocié une réduction).\nTotal actuel : '+money(o.total), o.total);
+          if(nv===null) return;
+          const newTotal = Number(nv);
+          if(isNaN(newTotal) || newTotal<0){ alert('Montant invalide.'); return; }
+          if(!o.originalTotal) o.originalTotal = o.total;
+          o.total = newTotal;
+          await logActivity(currentUser.name, 'a ajusté le prix de la commande de '+o.customer+' à '+money(newTotal));
         }
         await storageSet('joda_orders', orders, true);
-        renderOrdersTab(); if(currentUser.role==='admin') renderOverview();
+        renderOrdersTab(); if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); } else renderMyStatsTab();
       });
     });
   }
@@ -1580,6 +1659,46 @@ Données du mois (${monthLabel(Date.now())}) :
     document.getElementById('teamMsg').textContent = 'Équipe enregistrée.';
     renderLoginSelect();
     setTimeout(()=>document.getElementById('teamMsg').textContent='',2000);
+  });
+
+  /* ---------- RÉGLAGES TAB (admin) ---------- */
+  function renderSettingsTab(){
+    document.getElementById('setWhatsapp').value = settings.whatsapp || '';
+    const a = salesArchive || {count:0, revenue:0, byProduct:{}};
+    const topArch = Object.entries(a.byProduct||{}).sort((x,y)=>y[1]-x[1]).slice(0,5)
+      .map(([n,q])=>`${n} : ${q}`).join('\n') || 'aucun';
+    document.getElementById('archiveSummary').textContent =
+      `Résumé cumulé conservé (même après réinitialisation) :\n`
+      + `• Ventes archivées : ${a.count||0} commandes\n`
+      + `• Chiffre d'affaires archivé : ${money(a.revenue||0)}\n`
+      + `• Top articles archivés :\n${topArch}`;
+  }
+
+  document.getElementById('saveWhatsappBtn').addEventListener('click', async ()=>{
+    const val = document.getElementById('setWhatsapp').value.replace(/[^0-9]/g,'');
+    settings.whatsapp = val;
+    await storageSet('joda_settings', settings, true);
+    document.getElementById('whatsappMsg').textContent = val ? 'Numéro enregistré.' : 'Numéro effacé.';
+    renderContactBar();
+    setTimeout(()=>document.getElementById('whatsappMsg').textContent='',2000);
+  });
+
+  document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
+    if(!confirm('Réinitialiser toutes les ventes ?\n\nLes commandes seront effacées mais le résumé statistique cumulé sera conservé. Cette action est irréversible.')) return;
+    // cumuler dans l'archive avant d'effacer
+    salesArchive.count = (salesArchive.count||0) + orders.length;
+    salesArchive.revenue = (salesArchive.revenue||0) + orders.reduce((s,o)=>s+o.total,0);
+    salesArchive.byProduct = salesArchive.byProduct || {};
+    orders.forEach(o=> o.items.forEach(it=>{
+      salesArchive.byProduct[it.name] = (salesArchive.byProduct[it.name]||0) + it.qty;
+    }));
+    orders = [];
+    await storageSet('joda_sales_archive', salesArchive, true);
+    await storageSet('joda_orders', orders, true);
+    await logActivity(currentUser.name, "a réinitialisé l'historique des ventes (résumé conservé)");
+    document.getElementById('resetMsg').textContent = 'Historique réinitialisé. Résumé conservé.';
+    renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); renderOrdersTab();
+    setTimeout(()=>document.getElementById('resetMsg').textContent='',3000);
   });
 
   /* ---------- MON PROFIL TAB (assistant) ---------- */
