@@ -6,6 +6,7 @@
 <title>Joda Boutique</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg: #F7F4EC;
@@ -387,12 +388,12 @@
     <div id="loginGate" class="login-shell">
       <img class="brand-logo" alt="Joda Boutique">
       <h2>Espace équipe</h2>
-      <p class="sub">Choisissez votre profil et entrez votre code personnel.</p>
+      <p class="sub">Connectez-vous avec l'email et le mot de passe fournis par l'administratrice.</p>
       <div class="login-panel">
-        <label>Profil</label>
-        <select class="text-input" id="loginSelect"></select>
-        <label>Code personnel</label>
-        <input class="text-input" id="loginPin" type="password" placeholder="••••">
+        <label>Email</label>
+        <input class="text-input" id="loginEmail" type="email" placeholder="vous@exemple.com" autocomplete="username">
+        <label>Mot de passe</label>
+        <input class="text-input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password">
         <button class="btn-primary" style="width:100%;" id="loginBtn">Se connecter</button>
         <div class="status-msg" id="loginMsg"></div>
       </div>
@@ -460,13 +461,21 @@
       </div>
 
       <div id="tab-equipe" class="tab-content" style="display:none;">
+        <div class="panel" style="margin-bottom:24px;">
+          <h4>Créer un compte assistante</h4>
+          <p class="section-note" style="margin-bottom:12px;">Un vrai compte sécurisé est créé. Transmettez ensuite l'email et le mot de passe à la personne concernée.</p>
+          <div class="form-row">
+            <input class="text-input" style="margin:0;" id="newAssistName" placeholder="Nom (ex: Assistante 1)">
+            <input class="text-input" style="margin:0;" id="newAssistEmail" type="email" placeholder="Email">
+            <input class="text-input" style="margin:0;" id="newAssistPassword" type="text" placeholder="Mot de passe (6 car. min.)">
+            <button class="btn-mini" id="createAssistantBtn" style="height:38px;">Créer le compte</button>
+          </div>
+          <div class="status-msg" id="teamMsg"></div>
+        </div>
         <div class="panel">
           <h4>L'équipe de Joda Boutique</h4>
-          <p class="section-note" style="margin-bottom:16px;">Chaque profil a son propre code personnel. Elle seule (et vous, en tant qu'administratrice) peut modifier ses pièces et voir ses commandes en cours.</p>
+          <p class="section-note" style="margin-bottom:16px;">Chacune ne peut modifier que ses propres pièces (avant publication) et voir ses commandes en cours. Une assistante désactivée ne peut plus se connecter.</p>
           <div id="teamList"></div>
-          <button class="btn-mini" id="addAssistantBtn" style="margin-top:8px;">+ Ajouter une assistante</button>
-          <button class="btn-mini" id="saveTeamBtn" style="margin-top:8px;">Enregistrer les changements</button>
-          <div class="status-msg" id="teamMsg"></div>
         </div>
       </div>
 
@@ -530,12 +539,6 @@
             <tbody id="commissionsBody"></tbody>
           </table></div>
         </div>
-        <div class="panel">
-          <h4>Rapport mensuel — analyse globale</h4>
-          <p class="section-note" style="margin-bottom:12px;">Génère une analyse complète du mois : chiffre d'affaires, dépenses, bénéfice, ce qui a marché ou non, et des projections.</p>
-          <button class="btn-primary" id="genReportBtn">Générer le rapport du mois</button>
-          <div class="report-box" id="reportBox" style="display:none;"></div>
-        </div>
       </div>
 
       <div id="tab-mystats" class="tab-content" style="display:none;">
@@ -552,12 +555,6 @@
             <tbody id="myOrdersBody"></tbody>
           </table></div>
           <div class="status-msg" id="myOrdersEmpty" style="display:none;">Aucune commande prise en charge ce mois-ci.</div>
-        </div>
-        <div class="panel">
-          <h4>Mon rapport mensuel</h4>
-          <p class="section-note" style="margin-bottom:12px;">Résumé de votre activité du mois : ventes, commission, et conseils.</p>
-          <button class="btn-primary" id="genMyReportBtn">Générer mon rapport du mois</button>
-          <div class="report-box" id="myReportBox" style="display:none;"></div>
         </div>
       </div>
 
@@ -583,8 +580,8 @@
           <h4>Mon profil</h4>
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Nom affiché</label>
           <input class="text-input" id="myName">
-          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Code personnel</label>
-          <input class="text-input" id="myPin">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
+          <input class="text-input" id="myNewPassword" type="password" placeholder="6 caractères minimum" autocomplete="new-password">
           <button class="btn-mini" id="saveMyProfileBtn">Enregistrer</button>
           <div class="status-msg" id="myProfileMsg"></div>
         </div>
@@ -608,26 +605,11 @@
     <div id="checkoutForm" style="display:none;">
       <input class="text-input" id="custName" placeholder="Votre nom">
       <input class="text-input" id="custPhone" placeholder="Téléphone">
+      <input class="text-input" id="custAddress" placeholder="Adresse de livraison">
     </div>
     <div class="total-row"><span>Total</span><span id="cartTotal" style="color:var(--navy);">0 GNF</span></div>
     <button class="btn-primary" style="width:100%;" id="checkoutBtn">Commander</button>
     <div class="status-msg" id="checkoutMsg"></div>
-  </div>
-</div>
-
-<!-- CHATBOT -->
-<button class="chat-fab" id="chatFab" title="Besoin d'aide ?">💬</button>
-<div class="chat-panel" id="chatPanel">
-  <div class="chat-head">
-    <span>Joda vous répond</span>
-    <button id="chatClose">×</button>
-  </div>
-  <div class="chat-body" id="chatBody">
-    <div class="chat-msg bot">Bonjour ! Je suis l'assistante de Joda Boutique. Je peux vous renseigner sur nos bijoux, les prix, les stocks ou comment commander. Que cherchez-vous ?</div>
-  </div>
-  <div class="chat-input-row">
-    <input class="text-input" id="chatInput" placeholder="Écrivez votre question…">
-    <button id="chatSend">Envoyer</button>
   </div>
 </div>
 
@@ -651,105 +633,101 @@
     return ICONS.autre;
   }
 
-  const DEFAULT_TEAM = [
-    {id:'admin', name:'Administratrice principale', role:'admin', pin:'1234'},
-    {id:'a1', name:'Assistante 1', role:'assistant', pin:'1111'},
-    {id:'a2', name:'Assistante 2', role:'assistant', pin:'2222'},
-    {id:'a3', name:'Assistante 3', role:'assistant', pin:'3333'}
-  ];
-  const DEFAULT_PRODUCTS = [
-    {id:'p1', name:'Collier Aurore', cat:'Collier', price:180000, stock:6, addedBy:'admin'},
-    {id:'p2', name:'Bracelet Zawadi', cat:'Bracelet', price:95000, stock:10, addedBy:'admin'},
-    {id:'p3', name:'Boucles Nuru', cat:'Boucles', price:120000, stock:8, addedBy:'admin'},
-    {id:'p4', name:'Bague Amani', cat:'Bague', price:75000, stock:12, addedBy:'admin'},
-    {id:'p5', name:'Sac Tumaini', cat:'Sac', price:210000, stock:4, addedBy:'admin'},
-    {id:'p6', name:'Foulard Baraka', cat:'Foulard', price:130000, stock:7, addedBy:'admin'}
-  ];
+  /* ---------- SUPABASE ---------- */
+  const SUPABASE_URL = 'https://yohamnvnvasybwwanfsl.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_4f2gzkHAAErjMn8tlNxs4A_DMbsdOmi';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let products = [];
   let orders = [];
   let team = [];
   let activity = [];
   let cart = {};
-  let currentUser = null; // session only, not persisted
+  let currentUser = null;
   let likes = {};
   let traffic = {};
   let expenses = [];
-  let settings = {}; // numéro whatsapp, etc.
-  let salesArchive = {count:0, revenue:0, byProduct:{}}; // résumé conservé après réinitialisation
-  let sessionLikes = {}; // pour limiter à 1 j'aime par pièce et par visite
+  let settings = {whatsapp:''};
+  let salesArchive = {count:0, revenue:0, byProduct:{}};
+  let sessionLikes = {};
 
-  const SUPABASE_URL = 'https://yohamnvnvasybwwanfsl.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_4f2gzkHAAErjMn8tlNxs4A_DMbsdOmi';
-
-  async function storageGet(key, shared){
-    try{
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&select=value`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer '+SUPABASE_KEY }
-      });
-      if(!res.ok) return null;
-      const rows = await res.json();
-      return (rows && rows.length) ? rows[0].value : null;
-    }catch(e){ console.error('storage get failed', e); return null; }
+  /* ---------- STOCKAGE CLÉ/VALEUR (réglages, j'aime, dépenses, journal…) ---------- */
+  async function storageGet(key){
+    const { data, error } = await sb.from('kv_store').select('value').eq('key', key).maybeSingle();
+    if(error){ console.error('storage get failed', error); return null; }
+    return data ? data.value : null;
   }
-  async function storageSet(key, value, shared){
-    try{
-      await fetch(`${SUPABASE_URL}/rest/v1/kv_store`, {
-        method:'POST',
-        headers:{
-          apikey: SUPABASE_KEY,
-          Authorization: 'Bearer '+SUPABASE_KEY,
-          'Content-Type':'application/json',
-          Prefer:'resolution=merge-duplicates'
-        },
-        body: JSON.stringify({key, value})
-      });
-    }catch(e){ console.error('storage set failed', e); }
+  async function storageSet(key, value){
+    const { error } = await sb.from('kv_store').upsert({ key, value }, { onConflict:'key' });
+    if(error) console.error('storage set failed', error);
   }
 
   async function logActivity(actorName, action){
+    if(!currentUser) return;
     activity.unshift({date:new Date().toLocaleString('fr-FR'), actor:actorName, action});
     activity = activity.slice(0,120);
-    await storageSet('joda_activity', activity, true);
+    await storageSet('joda_activity', activity);
   }
 
-  async function loadAll(){
-    const p = await storageGet('joda_products', true);
-    products = p || DEFAULT_PRODUCTS.slice();
-    if(!p) await storageSet('joda_products', products, true);
+  /* ---------- CHARGEMENT DES DONNÉES ---------- */
+  function rowToProduct(r){
+    return { id:r.id, name:r.name, cat:r.category, price:Number(r.price), stock:Number(r.stock),
+      addedBy:r.added_by, image:r.image||'', approved:r.approved, rejected:r.rejected, rejectReason:r.reject_reason };
+  }
+  async function loadProducts(){
+    const { data, error } = await sb.from('products').select('*').order('created_at', {ascending:false});
+    products = error ? [] : data.map(rowToProduct);
+  }
 
-    const o = await storageGet('joda_orders', true);
-    orders = o || [];
+  function rowToOrder(r){
+    const ts = new Date(r.created_at).getTime();
+    return { id:r.id, ts, date:new Date(r.created_at).toLocaleString('fr-FR'), customer:r.customer_name,
+      phone:r.phone||'', address:r.address||'', items:r.items||[], total:Number(r.total),
+      originalTotal: r.original_total!=null ? Number(r.original_total) : null, status:r.status, claimedBy:r.claimed_by };
+  }
+  async function loadOrders(){
+    const { data, error } = await sb.from('orders').select('*').order('created_at', {ascending:false});
+    orders = error ? [] : data.map(rowToOrder);
+  }
 
-    const t = await storageGet('joda_team', true);
-    team = t || DEFAULT_TEAM.slice();
-    let teamChanged = !t;
-    const assistantCount = team.filter(x=>x.role==='assistant').length;
-    if(assistantCount < 3){
-      let n = assistantCount;
-      while(n < 3){
-        n++;
-        team.push({id:'a'+n+'_'+Date.now()+Math.floor(Math.random()*1000), name:'Assistante '+n, role:'assistant', pin:String(n).repeat(4)});
-        teamChanged = true;
-      }
-    }
-    if(teamChanged) await storageSet('joda_team', team, true);
+  function rowToTeam(r){ return { id:r.id, name:r.name, role:r.role, active:r.active !== false }; }
+  async function loadTeam(){
+    const { data, error } = await sb.from('profiles').select('*').order('created_at', {ascending:true});
+    team = error ? [] : data.map(rowToTeam);
+  }
 
-    const a = await storageGet('joda_activity', true);
-    activity = a || [];
+  async function loadCurrentUser(){
+    const { data: { user } } = await sb.auth.getUser();
+    if(!user){ currentUser = null; return; }
+    const { data: profile, error } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    if(error || !profile || profile.active === false){ currentUser = null; return; }
+    currentUser = { id: profile.id, name: profile.name, role: profile.role };
+  }
 
-    likes = (await storageGet('joda_likes', true)) || {};
-    traffic = (await storageGet('joda_traffic', true)) || {};
-    expenses = (await storageGet('joda_expenses', true)) || [];
-    settings = (await storageGet('joda_settings', true)) || {whatsapp:''};
-    salesArchive = (await storageGet('joda_sales_archive', true)) || {count:0, revenue:0, byProduct:{}};
+  async function refreshAllData(){
+    await Promise.all([loadProducts(), loadOrders(), loadTeam()]);
+    activity = (await storageGet('joda_activity')) || [];
+    expenses = (await storageGet('joda_expenses')) || [];
+    settings = (await storageGet('joda_settings')) || {whatsapp:''};
+    salesArchive = (await storageGet('joda_sales_archive')) || {count:0, revenue:0, byProduct:{}};
+  }
+
+  async function init(){
+    await loadCurrentUser();
+    await loadProducts();
+    likes = (await storageGet('joda_likes')) || {};
+    settings = (await storageGet('joda_settings')) || {whatsapp:''};
 
     await trackVisit();
     renderContactBar();
-
     renderStore();
     renderCarousel();
-    renderLoginSelect();
+
+    if(currentUser){
+      await refreshAllData();
+      setView('admin');
+      renderLoggedArea();
+    }
   }
 
   /* ---------- TRAFFIC TRACKING ---------- */
@@ -760,16 +738,17 @@
     return date.getFullYear() + '-S' + String(week).padStart(2,'0');
   }
   async function trackVisit(){
+    traffic = (await storageGet('joda_traffic')) || {};
     const k = weekKey(Date.now());
     if(!traffic[k]) traffic[k] = {visits:0, clicks:0};
     traffic[k].visits++;
-    await storageSet('joda_traffic', traffic, true);
+    await storageSet('joda_traffic', traffic);
   }
   async function trackClick(){
     const k = weekKey(Date.now());
     if(!traffic[k]) traffic[k] = {visits:0, clicks:0};
     traffic[k].clicks++;
-    await storageSet('joda_traffic', traffic, true);
+    await storageSet('joda_traffic', traffic);
   }
 
   /* ---------- WHATSAPP HELPERS ---------- */
@@ -820,7 +799,7 @@
   function teamName(id){ const t = team.find(x=>x.id===id); return t ? t.name : '—'; }
 
   /* ---------- STORE RENDER ---------- */
-  function isApproved(p){ return p.approved !== false; }
+  function isApproved(p){ return p.approved === true; }
   function renderStore(){
     const grid = document.getElementById('productGrid');
     const visible = products.filter(isApproved);
@@ -857,7 +836,7 @@
         if(sessionLikes[id]) return; // 1 j'aime par visite
         sessionLikes[id] = true;
         likes[id] = (likes[id] || 0) + 1;
-        await storageSet('joda_likes', likes, true);
+        await storageSet('joda_likes', likes);
         trackClick();
         renderStore();
       });
@@ -989,40 +968,35 @@
     if(ids.length===0){ msg.textContent = 'Ajoutez au moins un article.'; return; }
     const name = document.getElementById('custName').value.trim();
     const phone = document.getElementById('custPhone').value.trim();
+    const address = document.getElementById('custAddress').value.trim();
     if(!name){ msg.textContent = "Merci d'indiquer votre nom."; return; }
-    const items = ids.map(id=>{
-      const p = products.find(x=>x.id===id);
-      return {id, name:p.name, price:p.price, qty:cart[id]};
+    if(!phone){ msg.textContent = "Merci d'indiquer votre numéro de téléphone."; return; }
+    if(!address){ msg.textContent = "Merci d'indiquer votre adresse de livraison."; return; }
+
+    const payloadItems = ids.map(id=>({ id, qty: cart[id] }));
+    const { data: order, error } = await sb.rpc('place_order', {
+      p_customer_name: name, p_phone: phone, p_address: address, p_items: payloadItems
     });
-    const total = items.reduce((s,it)=>s+it.price*it.qty,0);
-    const order = {
-      id: 'o'+Date.now(),
-      ts: Date.now(),
-      date: new Date().toLocaleString('fr-FR'),
-      customer: name, phone,
-      items, total, status:'nouvelle', claimedBy:null
-    };
-    orders.unshift(order);
-    items.forEach(it=>{
-      const p = products.find(x=>x.id===it.id);
-      if(p) p.stock = Math.max(0, Number(p.stock) - it.qty);
-    });
-    await storageSet('joda_orders', orders, true);
-    await storageSet('joda_products', products, true);
-    await logActivity('Cliente : '+name, 'a passé une commande de '+money(total));
+    if(error){
+      msg.textContent = error.message && error.message.length < 120 ? error.message : "La commande n'a pas pu être envoyée. Réessayez.";
+      return;
+    }
+
+    await loadProducts();
     cart = {};
     renderCart(); renderStore(); renderCarousel();
-    if(currentUser) renderLoggedArea();
+    if(currentUser){ await loadOrders(); renderOrdersTab(); }
 
-    // Message de confirmation + bouton WhatsApp vers la boutique
+    const items = order.items || [];
+    const total = Number(order.total);
     const recap = 'Bonjour Joda Boutique !%0AJe viens de passer une commande :%0A'
       + items.map(it=>`- ${it.name} x${it.qty}`).join('%0A')
       + `%0ATotal : ${money(total)}`
-      + `%0ANom : ${name}` + (phone ? `%0ATéléphone : ${phone}` : '');
+      + `%0ANom : ${name}%0ATéléphone : ${phone}%0AAdresse : ${address}`;
     const waHref = waLink(decodeURIComponent(recap));
     msg.innerHTML = 'Commande envoyée ! Merci ' + escapeHtml(name) + '.'
       + (waHref ? `<div class="checkout-wa"><a class="wa-btn" href="${waHref}" target="_blank" rel="noopener">${WA_ICON} Confirmer sur WhatsApp</a></div>` : '');
-    document.getElementById('custName').value=''; document.getElementById('custPhone').value='';
+    document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value='';
     setTimeout(()=>{ if(!waHref){ msg.textContent=''; closeDrawer(); } }, 4000);
   });
 
@@ -1042,25 +1016,29 @@
   setView('store');
 
   /* ---------- LOGIN ---------- */
-  function renderLoginSelect(){
-    const sel = document.getElementById('loginSelect');
-    sel.innerHTML = team.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
-  }
-  document.getElementById('loginBtn').addEventListener('click', ()=>{
-    const id = document.getElementById('loginSelect').value;
-    const pin = document.getElementById('loginPin').value;
-    const t = team.find(x=>x.id===id);
+  document.getElementById('loginBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
     const msg = document.getElementById('loginMsg');
-    if(!t){ msg.textContent = 'Profil introuvable.'; return; }
-    if(String(t.pin) !== String(pin)){ msg.textContent = 'Code incorrect.'; return; }
-    currentUser = t;
-    document.getElementById('loginPin').value='';
+    if(!email || !password){ msg.textContent = 'Renseignez votre email et votre mot de passe.'; return; }
+    msg.textContent = 'Connexion…';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){ msg.textContent = 'Identifiants incorrects.'; return; }
+    await loadCurrentUser();
+    if(!currentUser){
+      msg.textContent = 'Compte désactivé ou introuvable. Contactez votre administratrice.';
+      await sb.auth.signOut();
+      return;
+    }
+    document.getElementById('loginPassword').value='';
     msg.textContent='';
-    logActivity(t.name, "s'est connectée à l'espace équipe");
+    await refreshAllData();
+    await logActivity(currentUser.name, "s'est connecté(e) à l'espace équipe");
     setView('admin');
     renderLoggedArea();
   });
-  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+    await sb.auth.signOut();
     currentUser = null;
     setView('admin');
   });
@@ -1110,11 +1088,10 @@
     document.getElementById('ordersTitle').textContent = currentUser.role==='admin' ? 'Toutes les commandes' : 'Commandes disponibles et en cours';
     document.getElementById('addedByHeadCell').style.display = currentUser.role==='admin' ? '' : 'none';
 
-    if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); }
+    if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); renderTeamTab(); }
     renderProductsTab();
     renderOrdersTab();
-    if(currentUser.role==='admin') renderTeamTab();
-    else { renderMyProfileTab(); renderMyStatsTab(); }
+    if(currentUser.role!=='admin'){ renderMyProfileTab(); renderMyStatsTab(); }
   }
 
   function renderOverview(){
@@ -1184,7 +1161,6 @@
     barChart(document.getElementById('weeklySales'),
       Object.entries(weekMap).map(([label,v])=>({label, value:v.qty})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
 
-    // meilleures ventes = commandes actuelles + archive cumulée
     const allMap = soldQuantities(null);
     const combined = {};
     Object.entries(allMap).forEach(([n,v])=>{ combined[n] = (combined[n]||0) + v.qty; });
@@ -1227,7 +1203,6 @@
     const mineWeek = mine.filter(o=>o.ts >= weekAgo);
     const mineMonth = mine.filter(o=>monthKey(o.ts)===mk);
     const weekSales = mineWeek.filter(o=>o.status==='traitée').reduce((s,o)=>s+o.total,0);
-    const monthSales = mineMonth.filter(o=>o.status==='traitée').reduce((s,o)=>s+o.total,0);
     const weekCom = commissionOf(mineWeek);
     const monthCom = commissionOf(mineMonth);
     const pending = mineMonth.filter(o=>o.status!=='traitée').length;
@@ -1259,42 +1234,6 @@
       </tr>`;
     }).join('');
   }
-
-  document.getElementById('genMyReportBtn').addEventListener('click', async ()=>{
-    const box = document.getElementById('myReportBox');
-    box.style.display = 'block';
-    box.textContent = 'Analyse en cours…';
-    const now = Date.now();
-    const mk = monthKey(now);
-    const mineMonth = assistantOrders(currentUser.id, o=> o.ts && monthKey(o.ts)===mk);
-    const treated = mineMonth.filter(o=>o.status==='traitée');
-    const sales = treated.reduce((s,o)=>s+o.total,0);
-    const com = commissionOf(mineMonth);
-    const soldMap = {};
-    mineMonth.forEach(o=> o.items.forEach(it=>{ soldMap[it.name] = (soldMap[it.name]||0) + it.qty; }));
-    const topSold = Object.entries(soldMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,q])=>n+' : '+q).join('; ') || 'aucune vente';
-
-    const prompt = `Tu rédiges le rapport mensuel personnel d'une assistante de vente de Joda Boutique (bijoux et accessoires, Guinée, monnaie GNF). Ton chaleureux et encourageant mais factuel, en français. Utilise uniquement les données fournies, sans rien inventer. Structure : 1) Résumé de son mois, 2) Ses points forts, 3) Sa commission, 4) Un ou deux conseils simples pour le mois prochain. Maximum 200 mots, paragraphes simples sans markdown.
-
-Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
-- Commandes prises en charge : ${mineMonth.length}, dont ${treated.length} traitées
-- Ventes traitées : ${sales.toLocaleString('fr-FR')} GNF
-- Commission (10% des ventes traitées) : ${com.toLocaleString('fr-FR')} GNF
-- Articles qu'elle a le plus vendus : ${topSold}`;
-
-    try{
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, messages:[{role:"user", content:prompt}] })
-      });
-      const data = await response.json();
-      const text = (data.content||[]).filter(i=>i.type==='text').map(i=>i.text).join('\n').trim();
-      box.textContent = text || "Le rapport n'a pas pu être généré. Réessayez.";
-    }catch(e){
-      box.textContent = "Le rapport n'a pas pu être généré (connexion). Réessayez.";
-    }
-  });
 
   function monthKey(ts){ const d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
   function monthLabel(ts){ return new Date(ts).toLocaleDateString('fr-FR',{month:'long', year:'numeric'}); }
@@ -1350,7 +1289,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     body.querySelectorAll('button[data-exp]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         expenses = expenses.filter(x=>x.id!==btn.dataset.exp);
-        await storageSet('joda_expenses', expenses, true);
+        await storageSet('joda_expenses', expenses);
         renderFinancesTab();
       });
     });
@@ -1363,7 +1302,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     const msg = document.getElementById('expMsg');
     if(!label || !amount){ msg.textContent = 'Renseignez une description et un montant.'; return; }
     expenses.push({id:'e'+Date.now(), ts:Date.now(), label, amount, type});
-    await storageSet('joda_expenses', expenses, true);
+    await storageSet('joda_expenses', expenses);
     await logActivity(currentUser.name, 'a enregistré une dépense : '+label+' ('+money(amount)+')');
     document.getElementById('expLabel').value='';
     document.getElementById('expAmount').value='';
@@ -1372,66 +1311,10 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     renderFinancesTab();
   });
 
-  /* ---------- MONTHLY REPORT ---------- */
-  document.getElementById('genReportBtn').addEventListener('click', async ()=>{
-    const box = document.getElementById('reportBox');
-    box.style.display = 'block';
-    box.textContent = 'Analyse en cours…';
-    const f = monthFinancials(Date.now());
-    const soldMap = soldQuantities(o=> o.ts && monthKey(o.ts)===f.mk);
-    const topSold = Object.entries(soldMap).sort((a,b)=>b[1].qty-a[1].qty).slice(0,5)
-      .map(([n,v])=>n+' : '+v.qty+' vendus ('+v.revenue.toLocaleString('fr-FR')+' GNF)').join('; ') || 'aucune vente';
-    const likedList = Object.entries(likes).map(([pid,c])=>{
-      const p = products.find(x=>x.id===pid); return p ? p.name+' ('+c+' ❤)' : null;
-    }).filter(Boolean).join('; ') || 'aucun j\'aime enregistré';
-    const lowStock = products.filter(p=>Number(p.stock)<=3).map(p=>p.name+' ('+p.stock+')').join('; ') || 'aucun';
-    const expList = f.monthExpenses.map(e=>e.label+' : '+Number(e.amount).toLocaleString('fr-FR')+' GNF ('+e.type+')').join('; ') || 'aucune';
-    const curWeek = weekKey(Date.now());
-    const t = traffic[curWeek] || {visits:0, clicks:0};
-    const comDetail = team.filter(x=>x.role==='assistant').map(a=>{
-      const treated = assistantOrders(a.id, o=> o.ts && monthKey(o.ts)===f.mk && o.status==='traitée');
-      const sales = treated.reduce((s,o)=>s+o.total,0);
-      return a.name+' : '+Math.round(sales*COMMISSION_RATE).toLocaleString('fr-FR')+' GNF ('+treated.length+' commandes)';
-    }).join('; ') || 'aucune';
-    const totalComR = team.filter(x=>x.role==='assistant').reduce((sum,a)=>{
-      const treated = assistantOrders(a.id, o=> o.ts && monthKey(o.ts)===f.mk && o.status==='traitée');
-      return sum + Math.round(treated.reduce((s,o)=>s+o.total,0)*COMMISSION_RATE);
-    },0);
-
-    const prompt = `Tu es l'analyste financière de Joda Boutique, une boutique de bijoux et accessoires en Guinée (monnaie : GNF). Rédige un rapport mensuel clair et concret en français, destiné à la gérante. Utilise uniquement les données fournies, sans en inventer. Structure : 1) Résumé du mois, 2) Ce qui a bien marché, 3) Ce qui a moins marché ou points d'attention, 4) Budget (ventes, dépenses, commissions, résultat net), 5) Recommandations et projections simples pour le mois prochain. Reste concis (300 mots max), ton professionnel mais accessible, sans tableau ni markdown, juste des paragraphes et des tirets simples.
-
-Données du mois (${monthLabel(Date.now())}) :
-- Chiffre d'affaires : ${f.revenue.toLocaleString('fr-FR')} GNF sur ${f.monthOrders.length} commandes
-- Dépenses totales : ${f.totalExp.toLocaleString('fr-FR')} GNF — détail : ${expList}
-- Commissions des assistantes (10% des ventes traitées) : ${totalComR.toLocaleString('fr-FR')} GNF — détail : ${comDetail}
-- Résultat net (ventes − dépenses − commissions) : ${(f.profit - totalComR).toLocaleString('fr-FR')} GNF
-- Meilleures ventes : ${topSold}
-- Pièces préférées du public : ${likedList}
-- Stocks bas ou en rupture : ${lowStock}
-- Fréquentation cette semaine : ${t.visits} visites, ${t.clicks} clics`;
-
-    try{
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6",
-          max_tokens:1000,
-          messages:[{role:"user", content: prompt}]
-        })
-      });
-      const data = await response.json();
-      const text = (data.content||[]).filter(i=>i.type==='text').map(i=>i.text).join('\n').trim();
-      box.textContent = text || "Le rapport n'a pas pu être généré. Réessayez.";
-    }catch(e){
-      box.textContent = "Le rapport n'a pas pu être généré (connexion). Réessayez.";
-    }
-  });
-
+  /* ---------- PRODUITS TAB ---------- */
   function renderProductsTab(){
     const isAdmin = currentUser.role==='admin';
     let visible = isAdmin ? products : products.filter(p=>p.addedBy===currentUser.id);
-    // ordre : en attente, puis refusées, puis publiées
     const rank = p => isApproved(p) ? 2 : (p.rejected ? 1 : 0);
     visible = visible.slice().sort((a,b)=> rank(a) - rank(b));
     const body = document.getElementById('adminProductBody');
@@ -1442,6 +1325,7 @@ Données du mois (${monthLabel(Date.now())}) :
         (p.rejectReason ? `<div class="section-note" style="margin-top:4px;max-width:160px;">Motif : ${escapeHtml(p.rejectReason)}</div>` : '');
       else statusPill = '<span class="pill progress">en attente</span>';
       let actions = '';
+      const canEdit = isAdmin || (p.addedBy===currentUser.id && !isApproved(p));
       if(isAdmin && !isApproved(p)){
         actions += `<button class="btn-mini" data-act="approve" data-id="${p.id}">✓ Approuver</button>`;
         if(!p.rejected) actions += `<button class="btn-mini danger" data-act="reject" data-id="${p.id}">✗ Refuser</button>`;
@@ -1451,9 +1335,13 @@ Données du mois (${monthLabel(Date.now())}) :
         if(p.rejected) actions += `<button class="btn-mini" data-act="resubmit" data-id="${p.id}">Renvoyer</button>`;
       }
       if(isAdmin) actions += `<button class="btn-mini" data-act="edit" data-id="${p.id}">Modifier</button>`;
-      actions += `<button class="btn-mini" data-act="photo" data-id="${p.id}">Photo</button>
+      if(canEdit){
+        actions += `<button class="btn-mini" data-act="photo" data-id="${p.id}">Photo</button>
           <button class="btn-mini" data-act="restock" data-id="${p.id}">+ stock</button>
           <button class="btn-mini danger" data-act="delete" data-id="${p.id}">Retirer</button>`;
+      } else if(!isAdmin){
+        actions += `<span class="section-note">Publiée — contactez l'administratrice pour modifier.</span>`;
+      }
       return `
       <tr>
         <td>${p.image ? `<img class="photo-thumb" src="${p.image}" alt="">` : '—'}</td>
@@ -1473,19 +1361,17 @@ Données du mois (${monthLabel(Date.now())}) :
         if(!isAdmin && p.addedBy !== currentUser.id) return;
         if((btn.dataset.act==='approve' || btn.dataset.act==='reject') && !isAdmin) return;
         if(btn.dataset.act==='approve'){
-          p.approved = true;
-          delete p.rejected; delete p.rejectReason;
+          const { error } = await sb.from('products').update({ approved:true, rejected:false, reject_reason:null }).eq('id', id);
+          if(error){ alert('Erreur : '+error.message); return; }
           await logActivity(currentUser.name, 'a approuvé "'+p.name+'" (proposé par '+teamName(p.addedBy)+')');
-          await storageSet('joda_products', products, true);
-          renderProductsTab(); renderStore(); renderCarousel(); renderOverview();
+          await loadProducts(); renderProductsTab(); renderStore(); renderCarousel(); renderOverview();
         } else if(btn.dataset.act==='reject'){
           const reason = prompt('Motif du refus (visible par '+teamName(p.addedBy)+', qui pourra modifier la pièce et la renvoyer) :', '');
           if(reason===null) return;
-          p.rejected = true;
-          p.rejectReason = reason.trim() || 'Non précisé';
-          await logActivity(currentUser.name, 'a refusé "'+p.name+'" (proposé par '+teamName(p.addedBy)+') — motif : '+p.rejectReason);
-          await storageSet('joda_products', products, true);
-          renderProductsTab(); renderStore(); renderCarousel(); renderOverview();
+          const { error } = await sb.from('products').update({ rejected:true, reject_reason: reason.trim() || 'Non précisé' }).eq('id', id);
+          if(error){ alert('Erreur : '+error.message); return; }
+          await logActivity(currentUser.name, 'a refusé "'+p.name+'" (proposé par '+teamName(p.addedBy)+')');
+          await loadProducts(); renderProductsTab(); renderStore(); renderCarousel(); renderOverview();
         } else if(btn.dataset.act==='edit'){
           const newName = prompt('Nom de la pièce :', p.name);
           if(newName===null) return;
@@ -1495,36 +1381,39 @@ Données du mois (${monthLabel(Date.now())}) :
           if(newPrice===null) return;
           const newStock = prompt('Stock :', p.stock);
           if(newStock===null) return;
-          p.name = newName.trim() || p.name;
-          p.cat = newCat.trim() || p.cat;
-          p.price = Number(newPrice) || p.price;
-          p.stock = Number(newStock) >= 0 ? Number(newStock) : p.stock;
-          // une pièce refusée modifiée par son assistante repart automatiquement en attente
-          let logMsg = 'a modifié "'+p.name+'"';
+          const update = {
+            name: newName.trim() || p.name,
+            category: newCat.trim() || p.cat,
+            price: Number(newPrice) || p.price,
+            stock: Number(newStock) >= 0 ? Number(newStock) : p.stock
+          };
+          let logMsg = 'a modifié "'+update.name+'"';
           if(!isAdmin && p.rejected){
-            delete p.rejected; delete p.rejectReason;
-            logMsg = 'a modifié et renvoyé "'+p.name+'" pour approbation';
+            update.rejected = false; update.reject_reason = null;
+            logMsg = 'a modifié et renvoyé "'+update.name+'" pour approbation';
           }
+          const { error } = await sb.from('products').update(update).eq('id', id);
+          if(error){ alert('Erreur : '+error.message); return; }
           await logActivity(currentUser.name, logMsg);
-          await storageSet('joda_products', products, true);
-          renderProductsTab(); renderStore(); renderCarousel(); if(isAdmin) renderOverview();
+          await loadProducts(); renderProductsTab(); renderStore(); renderCarousel(); if(isAdmin) renderOverview();
         } else if(btn.dataset.act==='resubmit'){
-          delete p.rejected; delete p.rejectReason;
+          const { error } = await sb.from('products').update({ rejected:false, reject_reason:null }).eq('id', id);
+          if(error){ alert('Erreur : '+error.message); return; }
           await logActivity(currentUser.name, 'a renvoyé "'+p.name+'" pour approbation');
-          await storageSet('joda_products', products, true);
-          renderProductsTab();
+          await loadProducts(); renderProductsTab();
         } else if(btn.dataset.act==='delete'){
-          products = products.filter(x=>x.id!==id);
+          const { error } = await sb.from('products').delete().eq('id', id);
+          if(error){ alert('Erreur : '+error.message); return; }
           await logActivity(currentUser.name, 'a retiré "'+p.name+'" du catalogue');
-          await storageSet('joda_products', products, true);
-          renderProductsTab(); renderStore(); renderCarousel(); if(currentUser.role==='admin') renderOverview();
+          await loadProducts(); renderProductsTab(); renderStore(); renderCarousel(); if(isAdmin) renderOverview();
         } else if(btn.dataset.act==='restock'){
           const add = prompt('Combien de pièces ajouter au stock de "'+p.name+'" ?', '5');
           if(add===null) return;
-          p.stock = Number(p.stock) + (Number(add)||0);
+          const newStock = Number(p.stock) + (Number(add)||0);
+          const { error } = await sb.from('products').update({ stock:newStock }).eq('id', id);
+          if(error){ alert('Erreur : '+error.message); return; }
           await logActivity(currentUser.name, 'a réapprovisionné "'+p.name+'" (+'+(Number(add)||0)+')');
-          await storageSet('joda_products', products, true);
-          renderProductsTab(); renderStore(); renderCarousel(); if(currentUser.role==='admin') renderOverview();
+          await loadProducts(); renderProductsTab(); renderStore(); renderCarousel(); if(isAdmin) renderOverview();
         } else if(btn.dataset.act==='photo'){
           const input = document.createElement('input');
           input.type = 'file'; input.accept = 'image/*';
@@ -1532,10 +1421,11 @@ Données du mois (${monthLabel(Date.now())}) :
             const file = input.files[0];
             if(!file) return;
             try{
-              p.image = await resizeImageFile(file, 700, 0.72);
+              const image = await resizeImageFile(file, 700, 0.72);
+              const { error } = await sb.from('products').update({ image }).eq('id', id);
+              if(error){ alert('Erreur : '+error.message); return; }
               await logActivity(currentUser.name, 'a ajouté une photo pour "'+p.name+'"');
-              await storageSet('joda_products', products, true);
-              renderProductsTab(); renderStore(); renderCarousel();
+              await loadProducts(); renderProductsTab(); renderStore(); renderCarousel();
             }catch(e){ alert("La photo n'a pas pu être chargée."); }
           };
           input.click();
@@ -1553,13 +1443,15 @@ Données du mois (${monthLabel(Date.now())}) :
     const msg = document.getElementById('addProductMsg');
     if(!name || !price){ msg.textContent = 'Renseignez au moins un nom et un prix.'; return; }
     const isAdminAdd = currentUser.role==='admin';
-    const newProduct = { id:'p'+Date.now(), name, cat, price, stock: stock || 0, addedBy: currentUser.id, image:'', approved: isAdminAdd };
+    let image = '';
     if(photoInput.files && photoInput.files[0]){
-      try{ newProduct.image = await resizeImageFile(photoInput.files[0], 700, 0.72); }
+      try{ image = await resizeImageFile(photoInput.files[0], 700, 0.72); }
       catch(e){ /* pas grave, on continue sans photo */ }
     }
-    products.push(newProduct);
-    await storageSet('joda_products', products, true);
+    const { error } = await sb.from('products').insert({
+      name, category:cat, price, stock: stock || 0, added_by: currentUser.id, image, approved: isAdminAdd
+    });
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
     await logActivity(currentUser.name, isAdminAdd ? 'a ajouté "'+name+'" au catalogue' : 'a proposé "'+name+'" (en attente d\'approbation)');
     document.getElementById('npName').value='';
     document.getElementById('npCat').value='';
@@ -1568,9 +1460,10 @@ Données du mois (${monthLabel(Date.now())}) :
     photoInput.value='';
     msg.textContent = isAdminAdd ? '"'+name+'" ajouté et publié.' : '"'+name+'" envoyé pour approbation. Il sera visible des clients après validation de l\'administratrice.';
     setTimeout(()=>msg.textContent='',4000);
-    renderProductsTab(); renderStore(); renderCarousel(); if(currentUser.role==='admin') renderOverview();
+    await loadProducts(); renderProductsTab(); renderStore(); renderCarousel(); if(isAdminAdd) renderOverview();
   });
 
+  /* ---------- COMMANDES TAB ---------- */
   function renderOrdersTab(){
     const isAdmin = currentUser.role==='admin';
     let visible;
@@ -1590,12 +1483,15 @@ Données du mois (${monthLabel(Date.now())}) :
       if((isAdmin || o.claimedBy===currentUser.id) && o.status!=='traitée'){
         actionBtns += `<button class="btn-mini" data-act="adjust" data-id="${o.id}">Ajuster prix</button>`;
       }
+      if(isAdmin){
+        actionBtns += `<button class="btn-mini" data-act="assign" data-id="${o.id}">Attribuer</button>`;
+      }
       const totalCell = (o.originalTotal && o.originalTotal!==o.total)
         ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
         : money(o.total);
       return `<tr>
         <td>${o.date}</td>
-        <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}</td>
+        <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}${o.address ? '<br><span class="section-note">'+escapeHtml(o.address)+'</span>' : ''}</td>
         <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}</td>
         <td>${totalCell}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
@@ -1606,59 +1502,101 @@ Données du mois (${monthLabel(Date.now())}) :
     oBody.querySelectorAll('button[data-act]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const o = orders.find(x=>x.id===btn.dataset.id);
+        let update = null;
+        let logMsg = null;
         if(btn.dataset.act==='claim'){
-          o.status='en cours'; o.claimedBy = currentUser.id;
-          await logActivity(currentUser.name, 'a pris en charge la commande de '+o.customer);
+          update = { status:'en cours', claimed_by: currentUser.id };
+          logMsg = 'a pris en charge la commande de '+o.customer;
         } else if(btn.dataset.act==='done'){
-          o.status='traitée';
-          await logActivity(currentUser.name, 'a marqué traitée la commande de '+o.customer);
+          update = { status:'traitée' };
+          logMsg = 'a marqué traitée la commande de '+o.customer;
         } else if(btn.dataset.act==='adjust'){
           const nv = prompt('Prix de vente final pour la commande de '+o.customer+' (le client a peut-être négocié une réduction).\nTotal actuel : '+money(o.total), o.total);
           if(nv===null) return;
           const newTotal = Number(nv);
           if(isNaN(newTotal) || newTotal<0){ alert('Montant invalide.'); return; }
-          if(!o.originalTotal) o.originalTotal = o.total;
-          o.total = newTotal;
-          await logActivity(currentUser.name, 'a ajusté le prix de la commande de '+o.customer+' à '+money(newTotal));
+          update = { total:newTotal, original_total: o.originalTotal || o.total };
+          logMsg = 'a ajusté le prix de la commande de '+o.customer+' à '+money(newTotal);
+        } else if(btn.dataset.act==='assign'){
+          const assistants = team.filter(t=>t.role==='assistant' && t.active);
+          const choice = prompt('Attribuer cette commande à quelle assistante ?\n'+assistants.map((a,i)=>(i+1)+'. '+a.name).join('\n')+'\n\nEntrez le numéro :');
+          if(choice===null) return;
+          const idx = Number(choice)-1;
+          const a = assistants[idx];
+          if(!a){ alert('Choix invalide.'); return; }
+          update = { claimed_by: a.id, status: o.status==='nouvelle' ? 'en cours' : o.status };
+          logMsg = 'a attribué la commande de '+o.customer+' à '+a.name;
         }
-        await storageSet('joda_orders', orders, true);
+        if(!update) return;
+        const { error } = await sb.from('orders').update(update).eq('id', o.id);
+        if(error){ alert('Erreur : '+error.message); return; }
+        await logActivity(currentUser.name, logMsg);
+        await loadOrders();
         renderOrdersTab(); if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); } else renderMyStatsTab();
       });
     });
   }
 
-  /* ---------- TEAM TAB (admin) ---------- */
+  /* ---------- ÉQUIPE TAB (admin) ---------- */
   function renderTeamTab(){
     const wrap = document.getElementById('teamList');
-    wrap.innerHTML = team.map((t,i)=>`
+    wrap.innerHTML = team.map(t=>`
       <div class="team-row">
-        <input class="text-input" data-idx="${i}" data-field="name" value="${escapeHtml(t.name)}" style="flex:2;">
-        <input class="text-input" data-idx="${i}" data-field="pin" value="${escapeHtml(t.pin)}" style="flex:1;" placeholder="code">
-        <span class="role-badge ${t.role==='admin'?'':'assistant'}">${t.role==='admin'?'Admin':'Assistante'}</span>
-        ${t.role!=='admin' ? `<button class="btn-mini danger" data-remove="${i}">Retirer</button>` : ''}
-      </div>`).join('');
-    wrap.querySelectorAll('button[data-remove]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const idx = Number(btn.dataset.remove);
-        team.splice(idx,1);
-        renderTeamTab();
+        <div style="flex:2;">
+          <div>${escapeHtml(t.name)}</div>
+          <span class="role-badge ${t.role==='admin'?'':'assistant'}">${t.role==='admin'?'Admin':'Assistante'}</span>
+          ${!t.active ? '<span class="pill new">désactivée</span>' : ''}
+        </div>
+        ${t.role!=='admin' ? `
+          <button class="btn-mini" data-toggle="${t.id}" data-active="${t.active}">${t.active ? 'Désactiver' : 'Réactiver'}</button>
+          <button class="btn-mini" data-reset="${t.id}" data-name="${escapeHtml(t.name)}">Réinitialiser mot de passe</button>
+        ` : ''}
+      </div>`).join('') || '<div class="section-note">Aucun membre pour le moment.</div>';
+    wrap.querySelectorAll('button[data-toggle]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.toggle;
+        const nextActive = btn.dataset.active !== 'true';
+        const { error } = await sb.from('profiles').update({ active: nextActive }).eq('id', id);
+        if(error){ alert('Erreur : '+error.message); return; }
+        await logActivity(currentUser.name, (nextActive?'a réactivé ':'a désactivé ')+teamName(id));
+        await loadTeam(); renderTeamTab(); renderFinancesTab();
+      });
+    });
+    wrap.querySelectorAll('button[data-reset]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.reset; const name = btn.dataset.name;
+        const newPass = prompt('Nouveau mot de passe pour '+name+' (6 caractères minimum) :', '');
+        if(newPass===null) return;
+        if(newPass.length < 6){ alert('Mot de passe trop court (6 caractères minimum).'); return; }
+        const { error } = await sb.functions.invoke('reset-assistant-password', { body:{ userId:id, password:newPass } });
+        if(error){ alert("Erreur lors de la réinitialisation."); return; }
+        alert('Mot de passe mis à jour pour '+name+'. Transmettez-le lui en toute sécurité.');
+        await logActivity(currentUser.name, 'a réinitialisé le mot de passe de '+name);
       });
     });
   }
-  document.getElementById('addAssistantBtn').addEventListener('click', ()=>{
-    team.push({id:'a'+Date.now(), name:'Nouvelle assistante', role:'assistant', pin:'0000'});
-    renderTeamTab();
-  });
-  document.getElementById('saveTeamBtn').addEventListener('click', async ()=>{
-    document.querySelectorAll('#teamList input[data-field]').forEach(inp=>{
-      const idx = Number(inp.dataset.idx);
-      team[idx][inp.dataset.field] = inp.value.trim();
-    });
-    await storageSet('joda_team', team, true);
-    await logActivity(currentUser.name, "a mis à jour l'équipe");
-    document.getElementById('teamMsg').textContent = 'Équipe enregistrée.';
-    renderLoginSelect();
-    setTimeout(()=>document.getElementById('teamMsg').textContent='',2000);
+
+  document.getElementById('createAssistantBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('newAssistName').value.trim();
+    const email = document.getElementById('newAssistEmail').value.trim();
+    const password = document.getElementById('newAssistPassword').value;
+    const msg = document.getElementById('teamMsg');
+    if(!name || !email || !password || password.length < 6){
+      msg.textContent = 'Nom, email et mot de passe (6 caractères minimum) requis.';
+      return;
+    }
+    msg.textContent = 'Création en cours…';
+    const { data, error } = await sb.functions.invoke('create-assistant', { body:{ name, email, password } });
+    if(error || (data && data.error)){
+      msg.textContent = 'Erreur : ' + ((data && data.error) || 'impossible de créer le compte.');
+      return;
+    }
+    msg.textContent = `Compte créé pour ${name}. Transmettez-lui : ${email} / le mot de passe choisi.`;
+    document.getElementById('newAssistName').value='';
+    document.getElementById('newAssistEmail').value='';
+    document.getElementById('newAssistPassword').value='';
+    await logActivity(currentUser.name, 'a créé le compte assistante '+name);
+    await loadTeam(); renderTeamTab();
   });
 
   /* ---------- RÉGLAGES TAB (admin) ---------- */
@@ -1677,7 +1615,7 @@ Données du mois (${monthLabel(Date.now())}) :
   document.getElementById('saveWhatsappBtn').addEventListener('click', async ()=>{
     const val = document.getElementById('setWhatsapp').value.replace(/[^0-9]/g,'');
     settings.whatsapp = val;
-    await storageSet('joda_settings', settings, true);
+    await storageSet('joda_settings', settings);
     document.getElementById('whatsappMsg').textContent = val ? 'Numéro enregistré.' : 'Numéro effacé.';
     renderContactBar();
     setTimeout(()=>document.getElementById('whatsappMsg').textContent='',2000);
@@ -1685,16 +1623,16 @@ Données du mois (${monthLabel(Date.now())}) :
 
   document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
     if(!confirm('Réinitialiser toutes les ventes ?\n\nLes commandes seront effacées mais le résumé statistique cumulé sera conservé. Cette action est irréversible.')) return;
-    // cumuler dans l'archive avant d'effacer
     salesArchive.count = (salesArchive.count||0) + orders.length;
     salesArchive.revenue = (salesArchive.revenue||0) + orders.reduce((s,o)=>s+o.total,0);
     salesArchive.byProduct = salesArchive.byProduct || {};
     orders.forEach(o=> o.items.forEach(it=>{
       salesArchive.byProduct[it.name] = (salesArchive.byProduct[it.name]||0) + it.qty;
     }));
-    orders = [];
-    await storageSet('joda_sales_archive', salesArchive, true);
-    await storageSet('joda_orders', orders, true);
+    const { error } = await sb.from('orders').delete().not('id','is',null);
+    if(error){ document.getElementById('resetMsg').textContent = 'Erreur : '+error.message; return; }
+    await storageSet('joda_sales_archive', salesArchive);
+    await loadOrders();
     await logActivity(currentUser.name, "a réinitialisé l'historique des ventes (résumé conservé)");
     document.getElementById('resetMsg').textContent = 'Historique réinitialisé. Résumé conservé.';
     renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); renderOrdersTab();
@@ -1704,84 +1642,29 @@ Données du mois (${monthLabel(Date.now())}) :
   /* ---------- MON PROFIL TAB (assistant) ---------- */
   function renderMyProfileTab(){
     document.getElementById('myName').value = currentUser.name;
-    document.getElementById('myPin').value = currentUser.pin;
+    document.getElementById('myNewPassword').value = '';
   }
   document.getElementById('saveMyProfileBtn').addEventListener('click', async ()=>{
-    const t = team.find(x=>x.id===currentUser.id);
-    t.name = document.getElementById('myName').value.trim() || t.name;
-    t.pin = document.getElementById('myPin').value.trim() || t.pin;
-    currentUser = t;
-    await storageSet('joda_team', team, true);
-    document.getElementById('whoName').textContent = t.name;
-    document.getElementById('myProfileMsg').textContent = 'Profil mis à jour.';
-    renderLoginSelect();
-    setTimeout(()=>document.getElementById('myProfileMsg').textContent='',2000);
-  });
-
-  /* ---------- CHATBOT CLIENT ---------- */
-  const chatHistory = [];
-  const chatPanel = document.getElementById('chatPanel');
-  document.getElementById('chatFab').addEventListener('click', ()=>{
-    chatPanel.classList.toggle('open');
-    if(chatPanel.classList.contains('open')) document.getElementById('chatInput').focus();
-  });
-  document.getElementById('chatClose').addEventListener('click', ()=> chatPanel.classList.remove('open'));
-
-  function addChatMsg(text, who){
-    const body = document.getElementById('chatBody');
-    const div = document.createElement('div');
-    div.className = 'chat-msg ' + who;
-    div.textContent = text;
-    body.appendChild(div);
-    body.scrollTop = body.scrollHeight;
-    return div;
-  }
-
-  async function sendChat(){
-    const input = document.getElementById('chatInput');
-    const text = input.value.trim();
-    if(!text) return;
-    input.value = '';
-    addChatMsg(text, 'user');
-    chatHistory.push({role:'user', content:text});
-    const typing = addChatMsg('Joda écrit…', 'bot typing');
-    trackClick();
-
-    const catalog = products.filter(isApproved).map(p=>
-      `${p.name} (${p.cat}) — ${Number(p.price).toLocaleString('fr-FR')} GNF — ${Number(p.stock)>0 ? p.stock+' en stock' : 'épuisé'}`
-    ).join('\n');
-
-    const systemPrompt = `Tu es l'assistante virtuelle de Joda Boutique, une boutique de bijoux et accessoires ("L'excellence dans la qualité"). Tu parles français, tu es chaleureuse, brève (2-4 phrases max par réponse) et honnête. Tu aides les clientes à choisir, tu renseignes sur les prix et les stocks à partir du catalogue ci-dessous uniquement, et tu expliques comment commander : ajouter au panier puis cliquer "Commander" en laissant son nom et téléphone — l'équipe rappelle pour confirmer la livraison et le paiement. Si on te demande quelque chose qui n'est pas dans le catalogue ou que tu ne sais pas (délais exacts, adresse, promotions), dis-le simplement et invite à laisser ses coordonnées via une commande ou à contacter la boutique. Ne donne jamais d'informations inventées.
-
-CATALOGUE ACTUEL :
-${catalog}`;
-
-    try{
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model:"claude-sonnet-4-6",
-          max_tokens:1000,
-          system: systemPrompt,
-          messages: chatHistory.slice(-12)
-        })
-      });
-      const data = await response.json();
-      const reply = (data.content||[]).filter(i=>i.type==='text').map(i=>i.text).join('\n').trim()
-        || "Désolée, je n'ai pas pu répondre. Pouvez-vous reformuler ?";
-      typing.remove();
-      addChatMsg(reply, 'bot');
-      chatHistory.push({role:'assistant', content:reply});
-    }catch(e){
-      typing.remove();
-      addChatMsg("Désolée, je n'arrive pas à répondre pour le moment. Réessayez dans un instant.", 'bot');
+    const newName = document.getElementById('myName').value.trim();
+    const newPass = document.getElementById('myNewPassword').value;
+    const msg = document.getElementById('myProfileMsg');
+    if(newPass && newPass.length < 6){ msg.textContent = 'Le nouveau mot de passe doit faire 6 caractères minimum.'; return; }
+    if(newName && newName !== currentUser.name){
+      const { error } = await sb.from('profiles').update({ name:newName }).eq('id', currentUser.id);
+      if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+      currentUser.name = newName;
+      document.getElementById('whoName').textContent = newName;
     }
-  }
-  document.getElementById('chatSend').addEventListener('click', sendChat);
-  document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+    if(newPass){
+      const { error } = await sb.auth.updateUser({ password:newPass });
+      if(error){ msg.textContent = 'Erreur lors du changement de mot de passe : '+error.message; return; }
+    }
+    document.getElementById('myNewPassword').value='';
+    msg.textContent = 'Profil mis à jour.';
+    setTimeout(()=>msg.textContent='',2000);
+  });
 
-  loadAll();
+  init();
 })();
 </script>
 </body>
