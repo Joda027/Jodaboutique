@@ -119,10 +119,30 @@
         <label>Email</label>
         <input class="text-input" id="authEmail" type="email" placeholder="vous@exemple.com">
         <label>Mot de passe</label>
-        <input class="text-input" id="authPassword" type="password" placeholder="••••••••">
+        <div class="pw-field">
+          <input class="text-input" id="authPassword" type="password" placeholder="••••••••">
+          <button type="button" class="pw-toggle" id="authPasswordToggle">Afficher</button>
+        </div>
+        <button type="button" class="forgot-link" id="forgotPasswordBtn">Mot de passe oublié ?</button>
         <div class="section-note" id="signupNote" style="display:none;margin-bottom:10px;">Utilisez l'email sur lequel vous avez été invitée par l'administratrice, et choisissez un mot de passe (8 caractères minimum).</div>
         <button class="btn-primary" style="width:100%;" id="authSubmitBtn">Se connecter</button>
         <div class="status-msg" id="loginMsg"></div>
+      </div>
+    </div>
+
+    <!-- RESET PASSWORD (lien reçu par email) -->
+    <div id="resetGate" class="login-shell" style="display:none;">
+      <img class="brand-logo" alt="Joda Boutique">
+      <h2>Nouveau mot de passe</h2>
+      <p class="sub">Choisissez un nouveau mot de passe pour votre compte.</p>
+      <div class="login-panel">
+        <label>Nouveau mot de passe</label>
+        <div class="pw-field">
+          <input class="text-input" id="resetPassword" type="password" placeholder="8 caractères minimum">
+          <button type="button" class="pw-toggle" id="resetPasswordToggle">Afficher</button>
+        </div>
+        <button class="btn-primary" style="width:100%;" id="resetPasswordBtn">Enregistrer le mot de passe</button>
+        <div class="status-msg" id="resetPasswordMsg"></div>
       </div>
     </div>
 
@@ -303,11 +323,18 @@
 
       <div id="tab-reglages" class="tab-content" style="display:none;">
         <div class="panel" style="max-width:520px;">
-          <h4>Numéro WhatsApp de la boutique</h4>
+          <h4>Coordonnées de la boutique</h4>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Numéro WhatsApp</label>
           <p class="section-note" style="margin-bottom:12px;">Format international sans le "+" ni espaces. Exemple pour la Guinée : 224620000000. Ce numéro reçoit les confirmations de commande et s'affiche sur la boutique.</p>
           <input class="text-input" id="setWhatsapp" placeholder="224614307557">
-          <button class="btn-mini" id="saveWhatsappBtn">Enregistrer le numéro</button>
-          <div class="status-msg" id="whatsappMsg"></div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Numéro d'appel direct (facultatif)</label>
+          <p class="section-note" style="margin-bottom:12px;">Même format que ci-dessus. S'affiche à côté du bouton WhatsApp sous forme d'icône d'appel.</p>
+          <input class="text-input" id="setPhone" placeholder="224620000000">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Lien de la page Facebook (facultatif)</label>
+          <p class="section-note" style="margin-bottom:12px;">Adresse complète, ex: https://facebook.com/jodaboutique</p>
+          <input class="text-input" id="setFacebook" placeholder="https://facebook.com/jodaboutique">
+          <button class="btn-mini" id="saveContactBtn">Enregistrer</button>
+          <div class="status-msg" id="contactMsg"></div>
         </div>
         <div class="panel" style="max-width:520px;">
           <h4>Réinitialiser l'historique des ventes</h4>
@@ -319,7 +346,10 @@
         <div class="panel" style="max-width:520px;">
           <h4>Mon mot de passe</h4>
           <p class="section-note" style="margin-bottom:12px;">Changez votre mot de passe administratrice (8 caractères minimum).</p>
-          <input class="text-input" id="adminNewPassword" type="password" placeholder="Nouveau mot de passe">
+          <div class="pw-field">
+            <input class="text-input" id="adminNewPassword" type="password" placeholder="Nouveau mot de passe">
+            <button type="button" class="pw-toggle" id="adminNewPasswordToggle">Afficher</button>
+          </div>
           <button class="btn-mini" id="adminChangePasswordBtn">Changer le mot de passe</button>
           <div class="status-msg" id="adminPasswordMsg"></div>
         </div>
@@ -331,7 +361,10 @@
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Nom affiché</label>
           <input class="text-input" id="myName">
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Nouveau mot de passe (laisser vide pour ne pas changer)</label>
-          <input class="text-input" id="myPassword" type="password" placeholder="8 caractères minimum">
+          <div class="pw-field">
+            <input class="text-input" id="myPassword" type="password" placeholder="8 caractères minimum">
+            <button type="button" class="pw-toggle" id="myPasswordToggle">Afficher</button>
+          </div>
           <button class="btn-mini" id="saveMyProfileBtn">Enregistrer</button>
           <div class="status-msg" id="myProfileMsg"></div>
         </div>

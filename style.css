@@ -300,6 +300,28 @@
   .contact-bar{ display:flex; align-items:center; gap:12px; margin-top:18px; flex-wrap:wrap; }
   .contact-bar .ph{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--muted); }
   .checkout-wa{ margin-top:10px; }
+  .icon-btn{
+    display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
+    border-radius:50%; background:var(--bg-panel); border:1px solid var(--line); color:var(--navy);
+    text-decoration:none; flex-shrink:0;
+  }
+  .icon-btn:hover{ filter:brightness(0.95); }
+  .icon-btn svg{ width:18px; height:18px; fill:currentColor; }
+  .icon-btn.fb{ color:#1877F2; }
+
+  /* ---------- MOT DE PASSE ---------- */
+  .pw-field{ position:relative; }
+  .pw-field input.text-input{ padding-right:74px; }
+  .pw-toggle{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; padding:6px 8px; margin:0;
+    font-family:'JetBrains Mono', monospace; letter-spacing:.3px;
+  }
+  .pw-toggle:hover{ color:var(--navy); }
+  .forgot-link{
+    display:inline-block; background:none; border:none; color:var(--navy-light); font-size:12px;
+    text-decoration:underline; cursor:pointer; padding:0; margin:-4px 0 14px;
+  }
 
   /* ---------- LOGIN GATE ---------- */
   .login-shell{ max-width:400px; margin:70px auto; text-align:center; }

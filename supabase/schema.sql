@@ -80,7 +80,9 @@ create table if not exists activity_log (
 
 create table if not exists settings (
   id boolean primary key default true check (id),
-  whatsapp text default ''
+  whatsapp text default '',
+  phone text default '',
+  facebook text default ''
 );
 insert into settings (id, whatsapp) values (true, '') on conflict (id) do nothing;
 
