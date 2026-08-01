@@ -179,12 +179,12 @@
   document.getElementById('contactBar').addEventListener('click', (e)=>{
     if(e.target.closest('#contactMenuBtn')){
       e.stopPropagation();
-      document.getElementById('contactMenuPanel').classList.toggle('open');
+      document.querySelector('.contact-menu').classList.toggle('open');
     }
   });
   document.addEventListener('click', ()=>{
-    const panel = document.getElementById('contactMenuPanel');
-    if(panel) panel.classList.remove('open');
+    const menu = document.querySelector('.contact-menu');
+    if(menu) menu.classList.remove('open');
   });
 
   /* ---------- IMAGE HELPER ---------- */
