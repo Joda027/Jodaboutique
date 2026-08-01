@@ -155,6 +155,10 @@
     const txt = encodeURIComponent(message||'');
     return num ? `https://wa.me/${num}?text=${txt}` : '';
   }
+  function messengerLinkFrom(fbUrl){
+    const match = String(fbUrl||'').match(/facebook\.com\/(?:pages\/[^\/]+\/)?([^\/\?&]+)/i);
+    return match && match[1] ? `https://m.me/${match[1]}` : fbUrl;
+  }
   function renderContactBar(){
     const bar = document.getElementById('contactBar');
     const num = waNumber();
@@ -172,8 +176,9 @@
         <span class="mi-icon">${CALL_ICON}</span><span class="mi-text">Appeler<span class="mi-number">+${phoneNum}</span></span></a>`;
     }
     if(fbUrl){
-      items += `<a class="contact-menu-item fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener">
-        <span class="mi-icon">${FB_ICON}</span><span class="mi-text">Facebook</span></a>`;
+      const messengerLink = messengerLinkFrom(fbUrl);
+      items += `<a class="contact-menu-item fb" href="${escapeHtml(messengerLink)}" target="_blank" rel="noopener">
+        <span class="mi-icon">${FB_ICON}</span><span class="mi-text">Messenger</span></a>`;
     }
     bar.innerHTML = `
       <div class="contact-menu">
