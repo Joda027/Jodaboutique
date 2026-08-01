@@ -241,14 +241,15 @@
       const likeCount = likes[p.id] || 0;
       const liked = sessionLikes[p.id] ? 'liked' : '';
       const priceHtml = promoActive()
-        ? `<span class="price-old">${Number(p.price).toLocaleString('fr-FR')}</span><span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span><span class="promo-badge">-${settings.promo_percent}%</span>`
+        ? `<span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>
+           <div class="price-old-row"><span class="price-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
         : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
       return `<div class="tag-card" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
         <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
         ${media}
         <h3>${escapeHtml(p.name)}</h3>
         <div class="cat">${escapeHtml(p.cat)}</div>
-        <div class="price-row">${priceHtml}</div>
+        <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
         <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : p.stock + ' en stock'}</div>
         <button class="add" data-id="${p.id}" ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
       </div>`;
@@ -282,7 +283,7 @@
     section.style.display = '';
     track.innerHTML = carouselItems.map(p=>{
       const cp = promoActive()
-        ? `<span class="cp-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span>${effectivePrice(p.price).toLocaleString('fr-FR')} GNF <span class="promo-badge">-${settings.promo_percent}%</span>`
+        ? `${effectivePrice(p.price).toLocaleString('fr-FR')} GNF<div class="cp-old-row"><span class="cp-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
         : `${Number(p.price).toLocaleString('fr-FR')} GNF`;
       return `
       <div class="car-slide">
