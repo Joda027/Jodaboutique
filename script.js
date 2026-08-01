@@ -93,9 +93,14 @@
     expenses = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook').eq('id', true).maybeSingle();
+    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
-    settings = data || {whatsapp:'', phone:'', facebook:''};
+    settings = data || {whatsapp:'', phone:'', facebook:'', promo_active:false, promo_percent:0};
+  }
+  function promoActive(){ return !!settings.promo_active && Number(settings.promo_percent) > 0; }
+  function effectivePrice(price){
+    if(!promoActive()) return Number(price);
+    return Math.round(Number(price) * (1 - Number(settings.promo_percent)/100));
   }
   async function loadSalesArchive(){
     if(!currentUser || currentUser.role!=='admin'){ salesArchive = {count:0, revenue:0, byProduct:{}}; return; }
@@ -235,12 +240,16 @@
         : `<div class="icon">${iconFor(p.cat)}</div>`;
       const likeCount = likes[p.id] || 0;
       const liked = sessionLikes[p.id] ? 'liked' : '';
+      const priceHtml = promoActive()
+        ? `<span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>
+           <div class="price-old-row"><span class="price-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
+        : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
       return `<div class="tag-card" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
         <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
         ${media}
         <h3>${escapeHtml(p.name)}</h3>
         <div class="cat">${escapeHtml(p.cat)}</div>
-        <div class="price-row"><span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span></div>
+        <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
         <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : p.stock + ' en stock'}</div>
         <button class="add" data-id="${p.id}" ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
       </div>`;
@@ -272,14 +281,19 @@
     if(carouselTimer){ clearInterval(carouselTimer); carouselTimer = null; }
     if(carouselItems.length === 0){ section.style.display = 'none'; return; }
     section.style.display = '';
-    track.innerHTML = carouselItems.map(p=>`
+    track.innerHTML = carouselItems.map(p=>{
+      const cp = promoActive()
+        ? `${effectivePrice(p.price).toLocaleString('fr-FR')} GNF<div class="cp-old-row"><span class="cp-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
+        : `${Number(p.price).toLocaleString('fr-FR')} GNF`;
+      return `
       <div class="car-slide">
         <img src="${p.image}" alt="${escapeHtml(p.name)}" loading="lazy">
         <div class="car-caption">
           <div class="cn">${escapeHtml(p.name)}</div>
-          <div class="cp">${Number(p.price).toLocaleString('fr-FR')} GNF</div>
+          <div class="cp">${cp}</div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     dots.innerHTML = carouselItems.map((p,i)=>`<button class="car-dot ${i===0?'active':''}" data-i="${i}"></button>`).join('');
     dots.querySelectorAll('.car-dot').forEach(d=>{
       d.addEventListener('click', ()=> goToSlide(Number(d.dataset.i)));
@@ -346,7 +360,7 @@
         return `<div class="cart-item">
           <div>
             <div class="ci-name">${escapeHtml(p.name)}</div>
-            <div class="ci-price">${money(p.price)} × ${cart[id]}</div>
+            <div class="ci-price">${money(effectivePrice(p.price))} × ${cart[id]}</div>
           </div>
           <div class="qty-ctrl">
             <button data-act="dec" data-id="${id}">−</button>
@@ -367,7 +381,7 @@
     }
     const total = ids.reduce((s,id)=>{
       const p = products.find(x=>x.id===id);
-      return s + (p ? p.price * cart[id] : 0);
+      return s + (p ? effectivePrice(p.price) * cart[id] : 0);
     },0);
     document.getElementById('cartTotal').textContent = money(total);
   }
@@ -891,6 +905,47 @@ Données du mois (${monthLabel(Date.now())}) :
     }
   });
 
+  /* ---------- WEEKLY REPORT ---------- */
+  document.getElementById('genWeeklyReportBtn').addEventListener('click', async ()=>{
+    const box = document.getElementById('weeklyReportBox');
+    box.style.display = 'block';
+    box.textContent = 'Analyse en cours…';
+    const now = Date.now();
+    const weekAgo = now - 7*86400000;
+    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo);
+    const revenue = weekOrders.reduce((s,o)=>s+o.total,0);
+    const weekExpenses = expenses.filter(e=> e.ts >= weekAgo);
+    const totalExp = weekExpenses.reduce((s,e)=>s+Number(e.amount),0);
+    const soldMap = soldQuantities(o=> o.ts && o.ts >= weekAgo);
+    const topSold = Object.entries(soldMap).sort((a,b)=>b[1].qty-a[1].qty).slice(0,5)
+      .map(([n,v])=>n+' : '+v.qty+' vendus ('+v.revenue.toLocaleString('fr-FR')+' GNF)').join('; ') || 'aucune vente';
+    const lowStock = products.filter(p=>Number(p.stock)<=3).map(p=>p.name+' ('+p.stock+')').join('; ') || 'aucun';
+    const curWeek = weekKey(now);
+    const t = traffic[curWeek] || {visits:0, clicks:0};
+
+    const prompt = `Tu es l'analyste de Joda Boutique, une boutique de bijoux et accessoires en Guinée (monnaie : GNF). Rédige un rapport hebdomadaire court et concret en français, destiné à la gérante, sur les 7 derniers jours. Utilise uniquement les données fournies, sans en inventer. Structure : 1) Résumé de la semaine, 2) Ce qui a bien marché, 3) Points d'attention, 4) Une recommandation simple pour la semaine prochaine. Maximum 180 mots, paragraphes simples sans markdown.
+
+Données des 7 derniers jours :
+- Chiffre d'affaires : ${revenue.toLocaleString('fr-FR')} GNF sur ${weekOrders.length} commandes
+- Dépenses : ${totalExp.toLocaleString('fr-FR')} GNF
+- Meilleures ventes : ${topSold}
+- Stocks bas ou en rupture : ${lowStock}
+- Fréquentation : ${t.visits} visites, ${t.clicks} clics`;
+
+    try{
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:800, messages:[{role:"user", content: prompt}] })
+      });
+      const data = await response.json();
+      const text = (data.content||[]).filter(i=>i.type==='text').map(i=>i.text).join('\n').trim();
+      box.textContent = text || "Le rapport n'a pas pu être généré. Réessayez.";
+    }catch(e){
+      box.textContent = "Le rapport n'a pas pu être généré (connexion). Réessayez.";
+    }
+  });
+
   function renderProductsTab(){
     const isAdmin = currentUser.role==='admin';
     let visible = isAdmin ? products : products.filter(p=>p.addedBy===currentUser.id);
@@ -913,7 +968,8 @@ Données du mois (${monthLabel(Date.now())}) :
         if(p.rejected) actions += `<button class="btn-mini" data-act="resubmit" data-id="${p.id}">Renvoyer</button>`;
       }
       if(isAdmin) actions += `<button class="btn-mini" data-act="edit" data-id="${p.id}">Modifier</button>`;
-      actions += `<button class="btn-mini" data-act="photo" data-id="${p.id}">Photo</button>
+      actions += `<button class="btn-mini" data-act="editprice" data-id="${p.id}">Prix</button>
+          <button class="btn-mini" data-act="photo" data-id="${p.id}">Photo</button>
           <button class="btn-mini" data-act="restock" data-id="${p.id}">+ stock</button>
           <button class="btn-mini danger" data-act="delete" data-id="${p.id}">Retirer</button>`;
       return `
@@ -964,6 +1020,13 @@ Données du mois (${monthLabel(Date.now())}) :
           }
           await sb.from('products').update(patch).eq('id', p.id);
           await logActivity(currentUser.name, logMsg);
+        } else if(btn.dataset.act==='editprice'){
+          const newPrice = prompt('Nouveau prix de vente (GNF) pour "'+p.name+'" :', p.price);
+          if(newPrice===null) return;
+          const price = Number(newPrice);
+          if(!price || price <= 0){ alert('Prix invalide.'); return; }
+          await sb.from('products').update({price}).eq('id', p.id);
+          await logActivity(currentUser.name, 'a modifié le prix de "'+p.name+'" à '+money(price));
         } else if(btn.dataset.act==='resubmit'){
           await sb.from('products').update({rejected:false, reject_reason:null}).eq('id', p.id);
           await logActivity(currentUser.name, 'a renvoyé "'+p.name+'" pour approbation');
@@ -1145,6 +1208,8 @@ Données du mois (${monthLabel(Date.now())}) :
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';
+    document.getElementById('setPromoActive').checked = !!settings.promo_active;
+    document.getElementById('setPromoPercent').value = settings.promo_percent || '';
     const a = salesArchive || {count:0, revenue:0, byProduct:{}};
     const topArch = Object.entries(a.byProduct||{}).sort((x,y)=>y[1]-x[1]).slice(0,5)
       .map(([n,q])=>`${n} : ${q}`).join('\n') || 'aucun';
@@ -1164,6 +1229,19 @@ Données du mois (${monthLabel(Date.now())}) :
     document.getElementById('contactMsg').textContent = 'Coordonnées enregistrées.';
     renderContactBar();
     setTimeout(()=>document.getElementById('contactMsg').textContent='',2000);
+  });
+
+  document.getElementById('savePromoBtn').addEventListener('click', async ()=>{
+    const active = document.getElementById('setPromoActive').checked;
+    const percent = Number(document.getElementById('setPromoPercent').value) || 0;
+    const msg = document.getElementById('promoMsg');
+    if(active && (percent <= 0 || percent >= 100)){ msg.textContent = 'Indiquez un pourcentage valide (entre 1 et 99).'; return; }
+    await sb.from('settings').update({promo_active: active, promo_percent: percent}).eq('id', true);
+    await loadSettings();
+    await logActivity(currentUser.name, active ? `a activé une promotion de ${percent}%` : 'a désactivé la promotion');
+    msg.textContent = 'Promotion mise à jour.';
+    renderStore(); renderCarousel(); renderCart();
+    setTimeout(()=>msg.textContent='',2000);
   });
 
   document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
