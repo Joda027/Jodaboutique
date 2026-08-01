@@ -132,6 +132,7 @@
         await Promise.all([loadActivity(), loadExpenses(), loadSettings(), loadSalesArchive(), loadInvites(), loadTraffic()]);
       }
       renderLoggedArea();
+      startInactivityTimer();
     }
   }
 
@@ -542,11 +543,35 @@
     setView('admin');
   });
 
-  document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  async function doLogout(auto){
+    stopInactivityTimer();
     await sb.auth.signOut();
     currentUser = null;
     setView('admin');
-  });
+    if(auto){
+      const msg = document.getElementById('loginMsg');
+      if(msg) msg.textContent = 'Vous avez été déconnectée après 5 minutes d\'inactivité. Reconnectez-vous.';
+    }
+  }
+  document.getElementById('logoutBtn').addEventListener('click', ()=> doLogout(false));
+
+  /* ---------- DÉCONNEXION AUTO APRÈS INACTIVITÉ ---------- */
+  const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
+  let inactivityTimer = null;
+  function resetInactivityTimer(){
+    if(!currentUser) return;
+    if(inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(()=>{ if(currentUser) doLogout(true); }, INACTIVITY_LIMIT);
+  }
+  function startInactivityTimer(){
+    ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(ev=>{
+      document.addEventListener(ev, resetInactivityTimer, {passive:true});
+    });
+    resetInactivityTimer();
+  }
+  function stopInactivityTimer(){
+    if(inactivityTimer){ clearTimeout(inactivityTimer); inactivityTimer = null; }
+  }
 
   /* ---------- LOGGED AREA ---------- */
   function tabsForRole(role){
