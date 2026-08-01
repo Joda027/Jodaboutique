@@ -93,9 +93,9 @@
     expenses = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp').eq('id', true).maybeSingle();
+    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
-    settings = data || {whatsapp:''};
+    settings = data || {whatsapp:'', phone:'', facebook:''};
   }
   async function loadSalesArchive(){
     if(!currentUser || currentUser.role!=='admin'){ salesArchive = {count:0, revenue:0, byProduct:{}}; return; }
@@ -142,6 +142,8 @@
 
   /* ---------- WHATSAPP HELPERS ---------- */
   const WA_ICON = '<svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 00-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1012 2z"/></svg>';
+  const CALL_ICON = '<svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>';
+  const FB_ICON = '<svg viewBox="0 0 24 24"><path d="M22 12a10 10 0 10-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0022 12z"/></svg>';
   function waNumber(){ return (settings.whatsapp||'').replace(/[^0-9]/g,''); }
   function waLink(message){
     const num = waNumber();
@@ -151,11 +153,22 @@
   function renderContactBar(){
     const bar = document.getElementById('contactBar');
     const num = waNumber();
-    if(!num){ bar.style.display='none'; return; }
+    const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
+    const fbUrl = (settings.facebook||'').trim();
+    if(!num && !phoneNum && !fbUrl){ bar.style.display='none'; return; }
     bar.style.display='flex';
-    bar.innerHTML = `
-      <a class="wa-btn" href="${waLink('Bonjour Joda Boutique, je vous contacte depuis votre site.')}" target="_blank" rel="noopener">${WA_ICON} Nous contacter sur WhatsApp</a>
-      <span class="ph">${escapeHtml(settings.whatsapp)}</span>`;
+    let html = '';
+    if(num){
+      html += `<a class="wa-btn" href="${waLink('Bonjour Joda Boutique, je vous contacte depuis votre site.')}" target="_blank" rel="noopener">${WA_ICON} Nous contacter sur WhatsApp</a>
+        <span class="ph">${escapeHtml(settings.whatsapp)}</span>`;
+    }
+    if(phoneNum){
+      html += `<a class="icon-btn call" href="tel:+${phoneNum}" title="Appeler la boutique">${CALL_ICON}</a>`;
+    }
+    if(fbUrl){
+      html += `<a class="icon-btn fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener" title="Page Facebook">${FB_ICON}</a>`;
+    }
+    bar.innerHTML = html;
   }
 
   /* ---------- IMAGE HELPER ---------- */
@@ -410,6 +423,7 @@
     signupBtn.style.color = authMode==='signup' ? '#fff' : 'var(--ink)';
     document.getElementById('signupNote').style.display = authMode==='signup' ? 'block' : 'none';
     document.getElementById('authSubmitBtn').textContent = authMode==='signup' ? 'Créer mon compte' : 'Se connecter';
+    document.getElementById('forgotPasswordBtn').style.display = authMode==='signup' ? 'none' : 'inline-block';
     document.getElementById('loginMsg').textContent = '';
   }
   document.getElementById('modeLoginBtn').addEventListener('click', ()=>{ authMode='login'; updateAuthModeUI(); });
@@ -443,6 +457,53 @@
     }
     msg.textContent = '';
     document.getElementById('authPassword').value = '';
+    setView('admin');
+  });
+
+  document.getElementById('forgotPasswordBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('authEmail').value.trim();
+    const msg = document.getElementById('loginMsg');
+    if(!email){ msg.textContent = "Indiquez votre email ci-dessus, puis cliquez à nouveau sur ce lien."; return; }
+    msg.textContent = 'Envoi en cours…';
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+    msg.textContent = error ? ('Erreur : '+error.message) : "Si ce compte existe, un email de réinitialisation vient d'être envoyé.";
+  });
+
+  /* ---------- VISIBILITÉ DES MOTS DE PASSE ---------- */
+  function wirePasswordToggle(inputId, btnId){
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    btn.addEventListener('click', ()=>{
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Masquer' : 'Afficher';
+    });
+  }
+  wirePasswordToggle('authPassword', 'authPasswordToggle');
+  wirePasswordToggle('adminNewPassword', 'adminNewPasswordToggle');
+  wirePasswordToggle('myPassword', 'myPasswordToggle');
+  wirePasswordToggle('resetPassword', 'resetPasswordToggle');
+
+  /* ---------- RÉINITIALISATION VIA LIEN EMAIL ---------- */
+  sb.auth.onAuthStateChange((event)=>{
+    if(event === 'PASSWORD_RECOVERY'){
+      document.getElementById('storeView').style.display = 'none';
+      document.getElementById('adminView').style.display = '';
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('adminLoggedArea').style.display = 'none';
+      document.getElementById('resetGate').style.display = '';
+    }
+  });
+  document.getElementById('resetPasswordBtn').addEventListener('click', async ()=>{
+    const pw = document.getElementById('resetPassword').value;
+    const msg = document.getElementById('resetPasswordMsg');
+    if(!pw || pw.length < 8){ msg.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'; return; }
+    const { error } = await sb.auth.updateUser({password:pw});
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+    msg.textContent = 'Mot de passe mis à jour !';
+    document.getElementById('resetPassword').value = '';
+    await handleAuthSession();
+    document.getElementById('resetGate').style.display = 'none';
     setView('admin');
   });
 
@@ -1066,6 +1127,8 @@ Données du mois (${monthLabel(Date.now())}) :
   /* ---------- RÉGLAGES TAB (admin) ---------- */
   function renderSettingsTab(){
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
+    document.getElementById('setPhone').value = settings.phone || '';
+    document.getElementById('setFacebook').value = settings.facebook || '';
     const a = salesArchive || {count:0, revenue:0, byProduct:{}};
     const topArch = Object.entries(a.byProduct||{}).sort((x,y)=>y[1]-x[1]).slice(0,5)
       .map(([n,q])=>`${n} : ${q}`).join('\n') || 'aucun';
@@ -1076,13 +1139,15 @@ Données du mois (${monthLabel(Date.now())}) :
       + `• Top articles archivés :\n${topArch}`;
   }
 
-  document.getElementById('saveWhatsappBtn').addEventListener('click', async ()=>{
-    const val = document.getElementById('setWhatsapp').value.replace(/[^0-9]/g,'');
-    await sb.from('settings').update({whatsapp: val}).eq('id', true);
+  document.getElementById('saveContactBtn').addEventListener('click', async ()=>{
+    const wa = document.getElementById('setWhatsapp').value.replace(/[^0-9]/g,'');
+    const ph = document.getElementById('setPhone').value.replace(/[^0-9]/g,'');
+    const fb = document.getElementById('setFacebook').value.trim();
+    await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb}).eq('id', true);
     await loadSettings();
-    document.getElementById('whatsappMsg').textContent = val ? 'Numéro enregistré.' : 'Numéro effacé.';
+    document.getElementById('contactMsg').textContent = 'Coordonnées enregistrées.';
     renderContactBar();
-    setTimeout(()=>document.getElementById('whatsappMsg').textContent='',2000);
+    setTimeout(()=>document.getElementById('contactMsg').textContent='',2000);
   });
 
   document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
