@@ -157,19 +157,35 @@
     const fbUrl = (settings.facebook||'').trim();
     if(!num && !phoneNum && !fbUrl){ bar.style.display='none'; return; }
     bar.style.display='flex';
-    let html = '';
+    let items = '';
     if(num){
-      html += `<a class="wa-btn" href="${waLink('Bonjour Joda Boutique, je vous contacte depuis votre site.')}" target="_blank" rel="noopener">${WA_ICON} Nous contacter sur WhatsApp</a>
-        <span class="ph">${escapeHtml(settings.whatsapp)}</span>`;
+      items += `<a class="contact-menu-item wa" href="${waLink('Bonjour Joda Boutique, je vous contacte depuis votre site.')}" target="_blank" rel="noopener">
+        <span class="mi-icon">${WA_ICON}</span><span class="mi-text">WhatsApp</span></a>`;
     }
     if(phoneNum){
-      html += `<a class="icon-btn call" href="tel:+${phoneNum}" title="Appeler la boutique">${CALL_ICON}</a>`;
+      items += `<a class="contact-menu-item call" href="tel:+${phoneNum}">
+        <span class="mi-icon">${CALL_ICON}</span><span class="mi-text">Appeler<span class="mi-number">+${phoneNum}</span></span></a>`;
     }
     if(fbUrl){
-      html += `<a class="icon-btn fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener" title="Page Facebook">${FB_ICON}</a>`;
+      items += `<a class="contact-menu-item fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener">
+        <span class="mi-icon">${FB_ICON}</span><span class="mi-text">Facebook</span></a>`;
     }
-    bar.innerHTML = html;
+    bar.innerHTML = `
+      <div class="contact-menu">
+        <button type="button" class="contact-menu-btn" id="contactMenuBtn">Nous contacter ▾</button>
+        <div class="contact-menu-panel" id="contactMenuPanel">${items}</div>
+      </div>`;
   }
+  document.getElementById('contactBar').addEventListener('click', (e)=>{
+    if(e.target.closest('#contactMenuBtn')){
+      e.stopPropagation();
+      document.getElementById('contactMenuPanel').classList.toggle('open');
+    }
+  });
+  document.addEventListener('click', ()=>{
+    const panel = document.getElementById('contactMenuPanel');
+    if(panel) panel.classList.remove('open');
+  });
 
   /* ---------- IMAGE HELPER ---------- */
   function resizeImageFile(file, maxDim, quality){
