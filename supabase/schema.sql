@@ -82,7 +82,9 @@ create table if not exists settings (
   id boolean primary key default true check (id),
   whatsapp text default '',
   phone text default '',
-  facebook text default ''
+  facebook text default '',
+  promo_active boolean default false,
+  promo_percent numeric default 0
 );
 insert into settings (id, whatsapp) values (true, '') on conflict (id) do nothing;
 
@@ -178,6 +180,9 @@ declare
   v_order_id text := 'o' || (floor(extract(epoch from now())*1000))::bigint::text || floor(random()*1000)::text;
   v_ts bigint := (floor(extract(epoch from now())*1000))::bigint;
   v_qty integer;
+  v_unit_price numeric;
+  v_promo_active boolean := false;
+  v_promo_percent numeric := 0;
 begin
   if p_customer is null or length(trim(p_customer)) = 0 then
     raise exception 'Nom du client requis';
@@ -185,6 +190,10 @@ begin
   if p_items is null or jsonb_array_length(p_items) = 0 then
     raise exception 'Le panier est vide';
   end if;
+
+  select coalesce(promo_active,false), coalesce(promo_percent,0)
+    into v_promo_active, v_promo_percent
+    from settings where id = true;
 
   for v_item in select * from jsonb_array_elements(p_items) loop
     v_qty := (v_item->>'qty')::integer;
@@ -201,9 +210,14 @@ begin
       raise exception 'Stock insuffisant pour un des articles';
     end if;
 
-    v_total := v_total + (v_product.price * v_qty);
+    v_unit_price := v_product.price;
+    if v_promo_active and v_promo_percent > 0 then
+      v_unit_price := round(v_product.price * (1 - v_promo_percent/100.0));
+    end if;
+
+    v_total := v_total + (v_unit_price * v_qty);
     v_order_items := v_order_items || jsonb_build_object(
-      'id', v_product.id, 'name', v_product.name, 'price', v_product.price, 'qty', v_qty
+      'id', v_product.id, 'name', v_product.name, 'price', v_unit_price, 'qty', v_qty
     );
   end loop;
 

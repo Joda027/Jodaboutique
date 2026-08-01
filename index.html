@@ -257,6 +257,12 @@
           <p class="section-note" style="margin-bottom:12px;">Visites = ouvertures de la page. Clics = actions des visiteurs (j'aime, ajouts au panier).</p>
           <div id="trafficBars"></div>
         </div>
+        <div class="panel">
+          <h4>Rapport hebdomadaire</h4>
+          <p class="section-note" style="margin-bottom:12px;">Génère une analyse des 7 derniers jours : ventes, tendances et recommandations rapides.</p>
+          <button class="btn-primary" id="genWeeklyReportBtn">Générer le rapport de la semaine</button>
+          <div class="report-box" id="weeklyReportBox" style="display:none;"></div>
+        </div>
       </div>
 
       <div id="tab-finances" class="tab-content" style="display:none;">
@@ -335,6 +341,17 @@
           <input class="text-input" id="setFacebook" placeholder="https://facebook.com/jodaboutique">
           <button class="btn-mini" id="saveContactBtn">Enregistrer</button>
           <div class="status-msg" id="contactMsg"></div>
+        </div>
+        <div class="panel" style="max-width:520px;">
+          <h4>Promotion</h4>
+          <p class="section-note" style="margin-bottom:12px;">Applique une réduction sur tous les prix affichés et facturés sur la boutique. Le prix de base de chaque pièce, lui, ne change pas dans le catalogue.</p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="setPromoActive"> Activer une promotion
+          </label>
+          <label style="font-size:12px;color:var(--muted);display:block;margin:12px 0 6px;">Pourcentage de réduction</label>
+          <input class="text-input" id="setPromoPercent" type="number" min="1" max="90" placeholder="ex: 20">
+          <button class="btn-mini" id="savePromoBtn">Enregistrer</button>
+          <div class="status-msg" id="promoMsg"></div>
         </div>
         <div class="panel" style="max-width:520px;">
           <h4>Réinitialiser l'historique des ventes</h4>
