@@ -1229,11 +1229,13 @@ Données des 7 derniers jours :
     const wa = document.getElementById('setWhatsapp').value.replace(/[^0-9]/g,'');
     const ph = document.getElementById('setPhone').value.replace(/[^0-9]/g,'');
     const fb = document.getElementById('setFacebook').value.trim();
-    await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb}).eq('id', true);
+    const msg = document.getElementById('contactMsg');
+    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb}).eq('id', true);
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
     await loadSettings();
-    document.getElementById('contactMsg').textContent = 'Coordonnées enregistrées.';
+    msg.textContent = 'Coordonnées enregistrées.';
     renderContactBar();
-    setTimeout(()=>document.getElementById('contactMsg').textContent='',2000);
+    setTimeout(()=>msg.textContent='',3000);
   });
 
   document.getElementById('savePromoBtn').addEventListener('click', async ()=>{
