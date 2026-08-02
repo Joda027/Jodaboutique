@@ -23,7 +23,7 @@ create table if not exists announcements (
   ts bigint not null,
   title text not null,
   body text not null,
-  sent_by text references team_members(id) on delete set null,
+  sent_by uuid references team_members(id) on delete set null,
   recipients integer not null default 0
 );
 
