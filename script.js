@@ -1738,7 +1738,8 @@ Données des 7 derniers jours :
     if(active && (percent <= 0 || percent >= 100)){ msg.textContent = 'Indiquez un pourcentage valide (entre 1 et 99).'; return; }
     const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
     if(active && endsAt && new Date(endsAt).getTime() <= Date.now()){ msg.textContent = 'La date de fin doit être dans le futur.'; return; }
-    await sb.from('settings').update({promo_active: active, promo_percent: percent, promo_ends_at: endsAt}).eq('id', true);
+    const { error } = await sb.from('settings').update({promo_active: active, promo_percent: percent, promo_ends_at: endsAt}).eq('id', true);
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
     await loadSettings();
     await logActivity(currentUser.name, active ? `a activé une promotion de ${percent}%` : 'a désactivé la promotion');
     msg.textContent = 'Promotion mise à jour.';
