@@ -117,7 +117,7 @@
     await trackVisit();
     await initPush();
     renderContactBar();
-    renderSubscribeBanner();
+    renderSubscribeMini();
     renderCategoriesUI();
     renderStore();
     renderCarousel();
@@ -192,42 +192,33 @@
     const sub = await currentPushSubscription();
     label.textContent = sub ? 'Ne plus recevoir les nouveautés' : 'Recevoir les nouveautés';
   }
-  async function renderSubscribeBanner(){
-    const banner = document.getElementById('subscribeBanner');
-    if(!banner) return;
-    if(!pushSupported()){ banner.style.display = 'none'; return; }
-    banner.style.display = '';
-    const btn = document.getElementById('subscribeBannerBtn');
+  async function renderSubscribeMini(){
+    const btn = document.getElementById('subscribeMini');
+    if(!btn) return;
+    if(!pushSupported()){ btn.style.display = 'none'; return; }
+    btn.style.display = 'inline-flex';
     const sub = await currentPushSubscription();
     if(sub){
-      banner.classList.add('is-subscribed');
-      document.querySelector('#subscribeBanner .subscribe-title').textContent = '✓ Vous êtes abonnée';
-      document.querySelector('#subscribeBanner .subscribe-sub').textContent = 'Vous recevrez nos nouveautés, promotions et le suivi de vos commandes. Vous pouvez vous désabonner à tout moment.';
-      btn.textContent = 'Se désabonner';
+      btn.classList.add('is-subscribed');
+      btn.textContent = '✓ Abonnée';
     } else {
-      banner.classList.remove('is-subscribed');
-      document.querySelector('#subscribeBanner .subscribe-title').textContent = '🔔 Abonnez-vous à Joda Boutique';
-      document.querySelector('#subscribeBanner .subscribe-sub').textContent = 'Recevez en avant-première nos nouvelles pièces, nos promotions, et le suivi de vos commandes — directement sur votre appareil.';
-      btn.textContent = "S'abonner aux notifications";
+      btn.classList.remove('is-subscribed');
+      btn.textContent = "🔔 S'abonner";
     }
   }
-  const subscribeBannerBtn = document.getElementById('subscribeBannerBtn');
-  if(subscribeBannerBtn) subscribeBannerBtn.addEventListener('click', async ()=>{
-    const msg = document.getElementById('subscribeBannerMsg');
+  const subscribeMini = document.getElementById('subscribeMini');
+  if(subscribeMini) subscribeMini.addEventListener('click', async ()=>{
     const sub = await currentPushSubscription();
     if(sub){
+      if(!confirm('Se désabonner des notifications Joda Boutique ?')) return;
       await unsubscribeFromPush();
-      msg.textContent = 'Vous êtes désabonnée.';
     } else {
-      msg.textContent = 'Activation en cours…';
+      subscribeMini.textContent = 'Activation…';
       const ok = await subscribeToPush(null, null);
-      msg.textContent = ok
-        ? 'Abonnement réussi ! Vous recevrez nos notifications.'
-        : "Notifications refusées ou indisponibles. Vérifiez l'autorisation dans votre navigateur.";
+      if(!ok) alert("Notifications refusées ou indisponibles. Autorisez les notifications dans votre navigateur, puis réessayez.");
     }
-    await renderSubscribeBanner();
+    await renderSubscribeMini();
     await refreshSubscribeLabel();
-    setTimeout(()=>{ msg.textContent=''; }, 4000);
   });
   // Enregistre l'abonnement en base. orderId/customer facultatifs (suivi de commande).
   async function savePushSubscription(sub, orderId, customer){
