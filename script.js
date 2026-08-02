@@ -28,8 +28,10 @@
   let traffic = {};
   let expenses = [];
   let settings = {};
+  let categories = [];
   let salesArchive = {count:0, revenue:0, byProduct:{}};
   let sessionLikes = {};
+  let openCategories = {};
 
   const SUPABASE_URL = 'https://sfkxhelutkoqinmfceyc.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_HQc7xFR0jmCbFXXqhOFDhw_fjZ-x07V';
@@ -93,9 +95,10 @@
     expenses = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent').eq('id', true).maybeSingle();
+    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent,categories').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
-    settings = data || {whatsapp:'', phone:'', facebook:'', promo_active:false, promo_percent:0};
+    settings = data || {whatsapp:'', phone:'', facebook:'', promo_active:false, promo_percent:0, categories:[]};
+    categories = Array.isArray(settings.categories) ? settings.categories : [];
   }
   function promoActive(){ return !!settings.promo_active && Number(settings.promo_percent) > 0; }
   function effectivePrice(price){
@@ -113,6 +116,7 @@
     await Promise.all([loadProducts(), loadLikes(), loadSettings()]);
     await trackVisit();
     renderContactBar();
+    renderCategoriesUI();
     renderStore();
     renderCarousel();
 
@@ -229,41 +233,34 @@
 
   /* ---------- STORE RENDER ---------- */
   function isApproved(p){ return p.approved === true; }
-  function renderStore(){
-    const grid = document.getElementById('productGrid');
-    const visible = products.filter(isApproved);
-    document.getElementById('heroStockCount').textContent = visible.reduce((s,p)=>s+Number(p.stock||0),0);
-    document.getElementById('productCountNote').textContent = visible.length + ' pièces disponibles';
-    if(visible.length === 0){
-      grid.innerHTML = '<div class="loading">Aucune pièce pour le moment. Ajoutez-en depuis l\'espace équipe.</div>';
-      return;
-    }
-    grid.innerHTML = visible.map((p,i)=>{
-      const outOfStock = Number(p.stock) <= 0;
-      const low = Number(p.stock) > 0 && Number(p.stock) <= 3;
-      const media = p.image
-        ? `<div class="photo-wrap"><img src="${p.image}" alt="${escapeHtml(p.name)}" loading="lazy"></div>`
-        : `<div class="icon">${iconFor(p.cat)}</div>`;
-      const likeCount = likes[p.id] || 0;
-      const liked = sessionLikes[p.id] ? 'liked' : '';
-      const priceHtml = promoActive()
-        ? `<span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>
-           <div class="price-old-row"><span class="price-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
-        : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
-      return `<div class="tag-card" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
-        <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
-        ${media}
-        <h3>${escapeHtml(p.name)}</h3>
-        <div class="cat">${escapeHtml(p.cat)}</div>
-        <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
-        <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : p.stock + ' en stock'}</div>
-        <button class="add" data-id="${p.id}" ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
-      </div>`;
-    }).join('');
-    grid.querySelectorAll('button.add').forEach(btn=>{
+  function productCardHtml(p, i){
+    const outOfStock = Number(p.stock) <= 0;
+    const low = Number(p.stock) > 0 && Number(p.stock) <= 3;
+    const media = p.image
+      ? `<div class="photo-wrap"><img src="${p.image}" alt="${escapeHtml(p.name)}" loading="lazy"></div>`
+      : `<div class="icon">${iconFor(p.cat)}</div>`;
+    const likeCount = likes[p.id] || 0;
+    const liked = sessionLikes[p.id] ? 'liked' : '';
+    const priceHtml = promoActive()
+      ? `<span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>
+         <div class="price-old-row"><span class="price-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
+      : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
+    return `<div class="tag-card" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
+      <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
+      ${media}
+      <h3>${escapeHtml(p.name)}</h3>
+      <div class="cat">${escapeHtml(p.cat)}</div>
+      <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
+      <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : p.stock + ' en stock'}</div>
+      <button class="add" data-id="${p.id}" ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
+    </div>`;
+  }
+
+  function wireStoreButtons(root){
+    root.querySelectorAll('button.add').forEach(btn=>{
       btn.addEventListener('click', ()=>{ addToCart(btn.dataset.id); trackClick(); });
     });
-    grid.querySelectorAll('button[data-like]').forEach(btn=>{
+    root.querySelectorAll('button[data-like]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.like;
         if(sessionLikes[id]) return;
@@ -275,6 +272,90 @@
       });
     });
   }
+
+  function currentSearch(){
+    const nameEl = document.getElementById('searchName');
+    const minEl = document.getElementById('searchMin');
+    const maxEl = document.getElementById('searchMax');
+    return {
+      name: nameEl ? nameEl.value.trim().toLowerCase() : '',
+      min: minEl && minEl.value !== '' ? Number(minEl.value) : null,
+      max: maxEl && maxEl.value !== '' ? Number(maxEl.value) : null
+    };
+  }
+  function matchesSearch(p, s){
+    if(s.name && !String(p.name).toLowerCase().includes(s.name)) return false;
+    const price = effectivePrice(p.price);
+    if(s.min !== null && price < s.min) return false;
+    if(s.max !== null && price > s.max) return false;
+    return true;
+  }
+  function groupByCategory(list){
+    const map = {};
+    list.forEach(p=>{ const c = (p.cat && p.cat.trim()) || 'Autre'; (map[c] = map[c] || []).push(p); });
+    const ordered = [];
+    categories.forEach(c=>{ if(map[c]){ ordered.push({name:c, items:map[c]}); delete map[c]; } });
+    Object.keys(map).sort((a,b)=>a.localeCompare(b,'fr')).forEach(c=> ordered.push({name:c, items:map[c]}));
+    return ordered;
+  }
+
+  function renderStore(){
+    const grid = document.getElementById('productGrid');
+    const visible = products.filter(isApproved);
+    document.getElementById('heroStockCount').textContent = visible.reduce((s,p)=>s+Number(p.stock||0),0);
+
+    const s = currentSearch();
+    const searchActive = s.name !== '' || s.min !== null || s.max !== null;
+    const filtered = visible.filter(p=> matchesSearch(p, s));
+
+    document.getElementById('productCountNote').textContent =
+      searchActive ? (filtered.length + ' résultat' + (filtered.length>1?'s':'')) : (visible.length + ' pièces disponibles');
+
+    if(visible.length === 0){
+      grid.innerHTML = '<div class="loading">Aucune pièce pour le moment. Ajoutez-en depuis l\'espace équipe.</div>';
+      return;
+    }
+
+    if(searchActive){
+      grid.innerHTML = filtered.length
+        ? `<div class="grid">${filtered.map((p,i)=>productCardHtml(p,i)).join('')}</div>`
+        : '<div class="loading">Aucun produit ne correspond à votre recherche.</div>';
+      wireStoreButtons(grid);
+      return;
+    }
+
+    const groups = groupByCategory(visible);
+    grid.innerHTML = groups.map(g=>{
+      const isOpen = !!openCategories[g.name];
+      return `<div class="cat-group ${isOpen?'open':''}">
+        <button class="cat-header" type="button" data-cat-toggle="${escapeHtml(g.name)}">
+          <span class="cat-title">${escapeHtml(g.name)}</span>
+          <span class="cat-meta"><span class="cat-count">${g.items.length} pièce${g.items.length>1?'s':''}</span><span class="cat-chevron">▾</span></span>
+        </button>
+        <div class="cat-body"><div class="grid">${g.items.map((p,i)=>productCardHtml(p,i)).join('')}</div></div>
+      </div>`;
+    }).join('');
+    grid.querySelectorAll('[data-cat-toggle]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const name = btn.getAttribute('data-cat-toggle');
+        openCategories[name] = !openCategories[name];
+        btn.closest('.cat-group').classList.toggle('open', !!openCategories[name]);
+      });
+    });
+    wireStoreButtons(grid);
+  }
+
+  /* ---------- SEARCH BAR WIRING ---------- */
+  ['searchName','searchMin','searchMax'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('input', renderStore);
+  });
+  document.getElementById('clearSearch').addEventListener('click', ()=>{
+    document.getElementById('searchName').value = '';
+    document.getElementById('searchMin').value = '';
+    document.getElementById('searchMax').value = '';
+    renderStore();
+  });
 
   /* ---------- FEATURED CAROUSEL ---------- */
   let carouselTimer = null;
@@ -1110,6 +1191,11 @@ Données des 7 derniers jours :
       added_by: currentUser.id, approved: isAdminAdd
     });
     if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+    // enregistre automatiquement une nouvelle catégorie dans la liste gérée (admin uniquement)
+    if(isAdminAdd && cat && cat!=='Autre' && !categories.some(c=>c.toLowerCase()===cat.toLowerCase())){
+      categories.push(cat);
+      await saveCategories();
+    }
     await logActivity(currentUser.name, isAdminAdd ? 'a ajouté "'+name+'" au catalogue' : 'a proposé "'+name+'" (en attente d\'approbation)');
     document.getElementById('npName').value='';
     document.getElementById('npCat').value='';
@@ -1234,12 +1320,58 @@ Données des 7 derniers jours :
   });
 
   /* ---------- RÉGLAGES TAB (admin) ---------- */
+  function renderCategoriesUI(){
+    // datalist for the product form (available to all team members)
+    const dl = document.getElementById('catOptions');
+    if(dl) dl.innerHTML = categories.map(c=>`<option value="${escapeHtml(c)}">`).join('');
+    // management list (admin only, in Réglages)
+    const list = document.getElementById('categoriesList');
+    if(list){
+      list.innerHTML = categories.length
+        ? categories.map(c=>`<span class="cat-chip">${escapeHtml(c)}<button type="button" data-remove-cat="${escapeHtml(c)}" title="Supprimer">×</button></span>`).join('')
+        : '<div class="section-note">Aucune catégorie pour l\'instant.</div>';
+      list.querySelectorAll('button[data-remove-cat]').forEach(btn=>{
+        btn.addEventListener('click', ()=> removeCategory(btn.getAttribute('data-remove-cat')));
+      });
+    }
+  }
+  async function saveCategories(){
+    const { error } = await sb.from('settings').update({categories}).eq('id', true);
+    if(error){ document.getElementById('categoryMsg').textContent = 'Erreur : '+error.message; return false; }
+    await loadSettings();
+    renderCategoriesUI(); renderStore();
+    return true;
+  }
+  async function removeCategory(name){
+    categories = categories.filter(c=>c!==name);
+    if(await saveCategories()){
+      const msg = document.getElementById('categoryMsg');
+      msg.textContent = 'Catégorie supprimée. Les produits déjà classés gardent leur nom.';
+      setTimeout(()=>msg.textContent='',3000);
+    }
+  }
+  const addCatBtn = document.getElementById('addCategoryBtn');
+  if(addCatBtn) addCatBtn.addEventListener('click', async ()=>{
+    const input = document.getElementById('newCategoryInput');
+    const name = input.value.trim();
+    const msg = document.getElementById('categoryMsg');
+    if(!name){ msg.textContent = 'Indiquez un nom de catégorie.'; return; }
+    if(categories.some(c=>c.toLowerCase()===name.toLowerCase())){ msg.textContent = 'Cette catégorie existe déjà.'; return; }
+    categories.push(name);
+    if(await saveCategories()){
+      input.value='';
+      msg.textContent = 'Catégorie ajoutée.';
+      setTimeout(()=>msg.textContent='',2000);
+    }
+  });
+
   function renderSettingsTab(){
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';
     document.getElementById('setPromoActive').checked = !!settings.promo_active;
     document.getElementById('setPromoPercent').value = settings.promo_percent || '';
+    renderCategoriesUI();
     const a = salesArchive || {count:0, revenue:0, byProduct:{}};
     const topArch = Object.entries(a.byProduct||{}).sort((x,y)=>y[1]-x[1]).slice(0,5)
       .map(([n,q])=>`${n} : ${q}`).join('\n') || 'aucun';

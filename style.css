@@ -88,8 +88,35 @@
   h2.section-title{ font-family:'Playfair Display', serif; font-size:28px; font-weight:600; color:var(--ink);}
   .section-note{ color:var(--muted); font-size:13px; font-family:'JetBrains Mono', monospace; }
 
+  /* ---------- COLLECTION FILTERS ---------- */
+  .collection-filters{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:30px; }
+  .collection-filters .text-input{ margin:0; width:auto; flex:1; min-width:150px; }
+  .collection-filters #searchName{ flex:2; min-width:200px; }
+  .collection-filters .btn-ghost{ flex:0 0 auto; }
+
+  /* ---------- CATEGORY ACCORDION ---------- */
+  .cat-group{ border:1px solid var(--line); border-radius:6px; margin-bottom:14px; overflow:hidden; background:var(--bg-panel); }
+  .cat-header{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    background:none; border:none; padding:18px 20px; text-align:left;
+  }
+  .cat-header:hover{ background:var(--bg-panel-2); }
+  .cat-header .cat-title{ font-family:'Playfair Display', serif; font-size:20px; font-weight:600; color:var(--ink); }
+  .cat-header .cat-meta{ display:flex; align-items:center; gap:14px; }
+  .cat-header .cat-count{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted); }
+  .cat-header .cat-chevron{ font-size:14px; color:var(--navy); transition:transform .2s; }
+  .cat-group.open .cat-header .cat-chevron{ transform:rotate(180deg); }
+  .cat-body{ display:none; padding:6px 20px 24px; border-top:1px solid var(--line); }
+  .cat-group.open .cat-body{ display:block; }
+
   /* ---------- PRODUCT GRID ---------- */
   .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:34px 26px; padding-bottom:70px;}
+  .cat-body .grid{ padding-bottom:6px; padding-top:18px; }
+  .cat-chip{
+    display:inline-flex; align-items:center; gap:8px; background:var(--bg-panel-2); border:1px solid var(--line);
+    border-radius:20px; padding:6px 12px; margin:0 8px 8px 0; font-size:13px;
+  }
+  .cat-chip button{ background:none; border:none; color:var(--wine); font-size:15px; line-height:1; padding:0; }
   .tag-card{
     position:relative; background:var(--bg-panel); border:1px solid var(--line); border-radius:6px;
     padding:26px 18px 20px; transition:transform .25s ease, border-color .25s ease, box-shadow .25s ease;
