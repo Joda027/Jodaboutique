@@ -84,7 +84,8 @@ create table if not exists settings (
   phone text default '',
   facebook text default '',
   promo_active boolean default false,
-  promo_percent numeric default 0
+  promo_percent numeric default 0,
+  categories jsonb default '[]'::jsonb
 );
 insert into settings (id, whatsapp) values (true, '') on conflict (id) do nothing;
 
