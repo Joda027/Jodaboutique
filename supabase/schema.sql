@@ -97,6 +97,27 @@ create table if not exists sales_archive (
 );
 insert into sales_archive (id) values (true) on conflict (id) do nothing;
 
+-- Abonnés aux notifications push (navigateur)
+create table if not exists push_subscribers (
+  id text primary key,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  order_id text,          -- rattache l'abonnement à une commande, si souscrit au checkout
+  customer text,
+  created_at timestamptz not null default now()
+);
+
+-- Annonces envoyées aux abonnés (promotions, nouveautés…)
+create table if not exists announcements (
+  id text primary key,
+  ts bigint not null,
+  title text not null,
+  body text not null,
+  sent_by text references team_members(id) on delete set null,
+  recipients integer not null default 0
+);
+
 -- ------------------------------------------------------------
 -- 2. FONCTIONS D'AIDE (SECURITY DEFINER pour éviter la récursion RLS)
 -- ------------------------------------------------------------
@@ -282,6 +303,8 @@ alter table expenses enable row level security;
 alter table activity_log enable row level security;
 alter table settings enable row level security;
 alter table sales_archive enable row level security;
+alter table push_subscribers enable row level security;
+alter table announcements enable row level security;
 
 -- team_members
 create policy "team can view team" on team_members for select using (is_team_member());
@@ -325,6 +348,17 @@ create policy "admin can update settings" on settings for update using (is_admin
 -- sales_archive
 create policy "admin can view archive" on sales_archive for select using (is_admin());
 create policy "admin can update archive" on sales_archive for update using (is_admin()) with check (is_admin());
+
+-- push_subscribers : le public peut s'abonner / se désabonner par son endpoint,
+-- mais ne peut jamais lire la liste (seule l'équipe la consulte).
+create policy "public can subscribe" on push_subscribers for insert with check (true);
+create policy "public can update own subscription" on push_subscribers for update using (true) with check (true);
+create policy "public can unsubscribe" on push_subscribers for delete using (true);
+create policy "team can view subscribers" on push_subscribers for select using (is_team_member());
+
+-- announcements (historique des envois, réservé à l'équipe)
+create policy "team can view announcements" on announcements for select using (is_team_member());
+create policy "admin can insert announcements" on announcements for insert with check (is_admin());
 
 -- ------------------------------------------------------------
 -- 6. PREMIÈRE ADMINISTRATRICE

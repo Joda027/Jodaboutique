@@ -364,6 +364,16 @@
           <div class="status-msg" id="categoryMsg"></div>
         </div>
         <div class="panel" style="max-width:520px;">
+          <h4>Notifications aux clientes</h4>
+          <p class="section-note" style="margin-bottom:12px;">Envoyez une notification à toutes les clientes abonnées (promotions, nouveautés, informations). Elle s'affiche directement sur leur téléphone ou ordinateur.</p>
+          <div class="section-note" id="subscriberCount" style="margin-bottom:12px;">—</div>
+          <input class="text-input" id="notifTitle" placeholder="Titre (ex: Nouvelle collection !)">
+          <textarea class="text-input" id="notifBody" rows="3" placeholder="Message (ex: -20% sur tous les colliers jusqu'à dimanche)"></textarea>
+          <button class="btn-mini" id="sendNotifBtn">Envoyer à toutes les abonnées</button>
+          <div class="status-msg" id="notifMsg"></div>
+          <div id="announcementsList" style="margin-top:16px;"></div>
+        </div>
+        <div class="panel" style="max-width:520px;">
           <h4>Promotion</h4>
           <p class="section-note" style="margin-bottom:12px;">Applique une réduction sur tous les prix affichés et facturés sur la boutique. Le prix de base de chaque pièce, lui, ne change pas dans le catalogue.</p>
           <label class="checkbox-row">
@@ -426,6 +436,9 @@
     <div id="checkoutForm" style="display:none;">
       <input class="text-input" id="custName" placeholder="Votre nom">
       <input class="text-input" id="custPhone" placeholder="Téléphone">
+      <label class="checkbox-row" style="margin-bottom:10px;">
+        <input type="checkbox" id="notifyOptIn" checked> Me prévenir du suivi de ma commande et des promotions
+      </label>
     </div>
     <div class="total-row"><span>Total</span><span id="cartTotal" style="color:var(--navy);">0 GNF</span></div>
     <button class="btn-primary" style="width:100%;" id="checkoutBtn">Commander</button>
