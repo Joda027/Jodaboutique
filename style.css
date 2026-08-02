@@ -94,7 +94,20 @@
   .collection-filters .text-input{ margin:0; width:auto; flex:1; min-width:150px; }
   .collection-filters #searchName{ flex:2; min-width:200px; }
   .collection-filters .btn-ghost{ flex:0 0 auto; }
-  body.searching .hero, body.searching #carouselSection{ display:none !important; }
+  body.searching .hero, body.searching #carouselSection, body.searching .subscribe-banner{ display:none !important; }
+
+  /* ---------- SUBSCRIBE BANNER ---------- */
+  .subscribe-banner{ background:var(--navy); color:#fff; padding:26px 0; }
+  .subscribe-inner{ display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+  .subscribe-title{ font-family:'Playfair Display', serif; font-size:22px; font-weight:600; }
+  .subscribe-sub{ color:rgba(255,255,255,0.82); font-size:14px; line-height:1.5; margin-top:4px; max-width:560px; }
+  .subscribe-banner .btn-primary{ background:#fff; color:var(--navy); flex:0 0 auto; }
+  .subscribe-banner .btn-primary:hover{ filter:brightness(0.95); }
+  .subscribe-msg{ color:rgba(255,255,255,0.92); font-size:13px; font-family:'JetBrains Mono', monospace; margin-top:10px; min-height:16px; }
+  .subscribe-banner.is-subscribed{ background:var(--bg-panel); color:var(--ink); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .subscribe-banner.is-subscribed .subscribe-sub{ color:var(--muted); }
+  .subscribe-banner.is-subscribed .btn-primary{ background:var(--navy); color:#fff; }
+  .subscribe-banner.is-subscribed .subscribe-msg{ color:var(--muted); }
 
   /* ---------- CATEGORY ACCORDION ---------- */
   .cat-group{ border:1px solid var(--line); border-radius:6px; margin-bottom:14px; overflow:hidden; background:var(--bg-panel); }
