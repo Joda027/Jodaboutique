@@ -115,6 +115,7 @@
   async function loadAll(){
     await Promise.all([loadProducts(), loadLikes(), loadSettings()]);
     await trackVisit();
+    await initPush();
     renderContactBar();
     renderCategoriesUI();
     renderStore();
@@ -153,6 +154,7 @@
   /* ---------- WHATSAPP HELPERS ---------- */
   const WA_ICON = '<svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 00-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1012 2z"/></svg>';
   const CALL_ICON = '<svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>';
+  const BELL_ICON = '<svg viewBox="0 0 24 24"><path d="M12 22a2.2 2.2 0 002.2-2.2H9.8A2.2 2.2 0 0012 22zm6.6-5.3v-5.2c0-3.2-1.8-5.9-4.8-6.6v-.7A1.8 1.8 0 0012 2.4a1.8 1.8 0 00-1.8 1.8v.7c-3 .7-4.8 3.4-4.8 6.6v5.2L3.6 18.5v.9h16.8v-.9l-1.8-1.8z"/></svg>';
   const FB_ICON = '<svg viewBox="0 0 24 24"><path d="M22 12a10 10 0 10-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0022 12z"/></svg>';
   function waNumber(){ return (settings.whatsapp||'').replace(/[^0-9]/g,''); }
   function waLink(message){
@@ -160,6 +162,89 @@
     const txt = encodeURIComponent(message||'');
     return num ? `https://wa.me/${num}?text=${txt}` : '';
   }
+  /* ---------- NOTIFICATIONS PUSH (client) ---------- */
+  // Clé publique VAPID (voir NOTIFICATIONS.md). La clé privée reste côté serveur.
+  const VAPID_PUBLIC_KEY = 'BA5wOVE-Es3Aj3HQnTwfBZYUTIqi9CaxK6D0Kbj9cXWQVg_-iU5HrpQhehXv8NWRnmADgOB2MMizeAb4Tb2AzaE';
+  let swRegistration = null;
+
+  function pushSupported(){
+    return 'serviceWorker' in navigator && 'PushManager' in window && !!VAPID_PUBLIC_KEY;
+  }
+  function urlBase64ToUint8Array(base64String){
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+  }
+  async function initPush(){
+    if(!pushSupported()) return;
+    try{ swRegistration = await navigator.serviceWorker.register('sw.js'); }
+    catch(e){ console.error('service worker', e); }
+  }
+  async function currentPushSubscription(){
+    if(!swRegistration) return null;
+    return await swRegistration.pushManager.getSubscription();
+  }
+  async function refreshSubscribeLabel(){
+    const label = document.getElementById('subscribeLabel');
+    if(!label) return;
+    const sub = await currentPushSubscription();
+    label.textContent = sub ? 'Ne plus recevoir les nouveautés' : 'Recevoir les nouveautés';
+  }
+  // Enregistre l'abonnement en base. orderId/customer facultatifs (suivi de commande).
+  async function savePushSubscription(sub, orderId, customer){
+    const json = sub.toJSON();
+    const row = {
+      id: 's'+Date.now()+Math.floor(Math.random()*1000),
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth
+    };
+    if(orderId) row.order_id = orderId;
+    if(customer) row.customer = customer;
+    // upsert sur endpoint : un même navigateur ne crée pas de doublon.
+    const { error } = await sb.from('push_subscribers').upsert(row, {onConflict:'endpoint'});
+    if(error) console.error('savePushSubscription', error);
+    return !error;
+  }
+  async function subscribeToPush(orderId, customer){
+    if(!pushSupported()) return false;
+    if(!swRegistration) await initPush();
+    if(!swRegistration) return false;
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted') return false;
+    let sub = await currentPushSubscription();
+    if(!sub){
+      sub = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    return await savePushSubscription(sub, orderId, customer);
+  }
+  async function unsubscribeFromPush(){
+    const sub = await currentPushSubscription();
+    if(!sub) return;
+    await sb.from('push_subscribers').delete().eq('endpoint', sub.endpoint);
+    await sub.unsubscribe();
+  }
+  // Bouton du menu contact (délégué : le menu est reconstruit à chaque rendu).
+  document.getElementById('contactBar').addEventListener('click', async (e)=>{
+    if(!e.target.closest('#subscribeBtn')) return;
+    e.stopPropagation();
+    const label = document.getElementById('subscribeLabel');
+    const sub = await currentPushSubscription();
+    if(sub){
+      await unsubscribeFromPush();
+      label.textContent = 'Recevoir les nouveautés';
+    } else {
+      label.textContent = 'Activation…';
+      const ok = await subscribeToPush(null, null);
+      label.textContent = ok ? 'Notifications activées ✓' : 'Notifications refusées';
+      setTimeout(refreshSubscribeLabel, 2500);
+    }
+  });
+
   function messengerLinkFrom(fbUrl){
     const match = String(fbUrl||'').match(/facebook\.com\/(?:pages\/[^\/]+\/)?([^\/\?&]+)/i);
     return match && match[1] ? `https://m.me/${match[1]}` : fbUrl;
@@ -185,11 +270,16 @@
       items += `<a class="contact-menu-item fb" href="${escapeHtml(messengerLink)}" target="_blank" rel="noopener">
         <span class="mi-icon">${FB_ICON}</span><span class="mi-text">Messenger</span></a>`;
     }
+    if(pushSupported()){
+      items += `<button type="button" class="contact-menu-item bell" id="subscribeBtn">
+        <span class="mi-icon">${BELL_ICON}</span><span class="mi-text" id="subscribeLabel">Recevoir les nouveautés</span></button>`;
+    }
     bar.innerHTML = `
       <div class="contact-menu">
         <button type="button" class="contact-menu-btn" id="contactMenuBtn">Nous contacter ▾</button>
         <div class="contact-menu-panel" id="contactMenuPanel">${items}</div>
       </div>`;
+    refreshSubscribeLabel();
   }
   document.getElementById('contactBar').addEventListener('click', (e)=>{
     if(e.target.closest('#contactMenuBtn')){
@@ -293,9 +383,13 @@
   function groupByCategory(list){
     const map = {};
     list.forEach(p=>{ const c = (p.cat && p.cat.trim()) || 'Autre'; (map[c] = map[c] || []).push(p); });
+    const toGroup = (name, items)=>{
+      const withImg = items.find(p=>p.image);
+      return {name, items, cover: withImg ? withImg.image : ''};
+    };
     const ordered = [];
-    categories.forEach(c=>{ if(map[c]){ ordered.push({name:c, items:map[c]}); delete map[c]; } });
-    Object.keys(map).sort((a,b)=>a.localeCompare(b,'fr')).forEach(c=> ordered.push({name:c, items:map[c]}));
+    categories.forEach(c=>{ if(map[c]){ ordered.push(toGroup(c, map[c])); delete map[c]; } });
+    Object.keys(map).sort((a,b)=>a.localeCompare(b,'fr')).forEach(c=> ordered.push(toGroup(c, map[c])));
     return ordered;
   }
 
@@ -306,6 +400,7 @@
 
     const s = currentSearch();
     const searchActive = s.name !== '' || s.min !== null || s.max !== null;
+    document.body.classList.toggle('searching', searchActive);
     const filtered = visible.filter(p=> matchesSearch(p, s));
 
     document.getElementById('productCountNote').textContent =
@@ -327,9 +422,12 @@
     const groups = groupByCategory(visible);
     grid.innerHTML = groups.map(g=>{
       const isOpen = !!openCategories[g.name];
+      const cover = g.cover
+        ? `<span class="cat-cover"><img src="${g.cover}" alt="" loading="lazy"></span>`
+        : `<span class="cat-cover cat-cover-icon">${iconFor(g.name)}</span>`;
       return `<div class="cat-group ${isOpen?'open':''}">
         <button class="cat-header" type="button" data-cat-toggle="${escapeHtml(g.name)}">
-          <span class="cat-title">${escapeHtml(g.name)}</span>
+          <span class="cat-head-left">${cover}<span class="cat-title">${escapeHtml(g.name)}</span></span>
           <span class="cat-meta"><span class="cat-count">${g.items.length} pièce${g.items.length>1?'s':''}</span><span class="cat-chevron">▾</span></span>
         </button>
         <div class="cat-body"><div class="grid">${g.items.map((p,i)=>productCardHtml(p,i)).join('')}</div></div>
@@ -500,6 +598,12 @@
     cart = {};
     renderCart(); renderStore(); renderCarousel();
     if(currentUser){ await loadOrders(); renderLoggedArea(); }
+
+    // Abonnement au suivi de commande (si la cliente l'a accepté).
+    const optIn = document.getElementById('notifyOptIn');
+    if(optIn && optIn.checked && pushSupported()){
+      subscribeToPush(data.id, name).catch(e=>console.error('push opt-in', e));
+    }
 
     const orderItems = data.items || [];
     const total = data.total || 0;
@@ -1245,10 +1349,18 @@ Données des 7 derniers jours :
         const o = orders.find(x=>x.id===btn.dataset.id);
         if(btn.dataset.act==='claim'){
           const { error } = await sb.from('orders').update({status:'en cours', claimed_by: currentUser.id}).eq('id', o.id);
-          if(!error) await logActivity(currentUser.name, 'a pris en charge la commande de '+o.customer);
+          if(!error){
+            await logActivity(currentUser.name, 'a pris en charge la commande de '+o.customer);
+            sendPush('Votre commande est en préparation',
+              `Bonjour ${o.customer}, votre commande Joda Boutique est prise en charge. Nous vous recontactons très vite.`, o.id);
+          }
         } else if(btn.dataset.act==='done'){
           const { error } = await sb.from('orders').update({status:'traitée'}).eq('id', o.id);
-          if(!error) await logActivity(currentUser.name, 'a marqué traitée la commande de '+o.customer);
+          if(!error){
+            await logActivity(currentUser.name, 'a marqué traitée la commande de '+o.customer);
+            sendPush('Votre commande est prête',
+              `Bonjour ${o.customer}, votre commande Joda Boutique est prête. Merci de votre confiance !`, o.id);
+          }
         } else if(btn.dataset.act==='adjust'){
           const nv = prompt('Prix de vente final pour la commande de '+o.customer+' (le client a peut-être négocié une réduction).\nTotal actuel : '+money(o.total), o.total);
           if(nv===null) return;
@@ -1365,6 +1477,57 @@ Données des 7 derniers jours :
     }
   });
 
+  /* ---------- ENVOI DES NOTIFICATIONS (admin) ---------- */
+  // Appelle l'Edge Function 'send-push'. orderId => notification ciblée sur une commande.
+  async function sendPush(title, body, orderId){
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return {error:'Session expirée'};
+    try{
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${session.access_token}` },
+        body: JSON.stringify({title, body, orderId: orderId || null})
+      });
+      const out = await res.json();
+      if(!res.ok) return {error: out.error || 'Envoi impossible'};
+      return out;
+    }catch(e){ return {error:"Le service de notification n'est pas joignable."}; }
+  }
+
+  async function renderNotificationsPanel(){
+    const countEl = document.getElementById('subscriberCount');
+    const listEl = document.getElementById('announcementsList');
+    if(!countEl) return;
+    const { count } = await sb.from('push_subscribers').select('id', {count:'exact', head:true});
+    countEl.textContent = (count || 0) + ' cliente(s) abonnée(s) aux notifications.';
+    const { data } = await sb.from('announcements').select('id,ts,title,recipients').order('ts', {ascending:false}).limit(5);
+    listEl.innerHTML = (data && data.length)
+      ? '<div class="section-note" style="margin-bottom:6px;">Derniers envois :</div>' + data.map(a=>
+          `<div class="section-note">• ${new Date(Number(a.ts)).toLocaleDateString('fr-FR')} — ${escapeHtml(a.title)} (${a.recipients} envoi${a.recipients>1?'s':''})</div>`
+        ).join('')
+      : '';
+  }
+
+  const sendNotifBtn = document.getElementById('sendNotifBtn');
+  if(sendNotifBtn) sendNotifBtn.addEventListener('click', async ()=>{
+    const title = document.getElementById('notifTitle').value.trim();
+    const body = document.getElementById('notifBody').value.trim();
+    const msg = document.getElementById('notifMsg');
+    if(!title || !body){ msg.textContent = 'Renseignez un titre et un message.'; return; }
+    msg.textContent = 'Envoi en cours…';
+    const out = await sendPush(title, body, null);
+    if(out.error){ msg.textContent = 'Erreur : '+out.error; return; }
+    await sb.from('announcements').insert({
+      id:'a'+Date.now(), ts:Date.now(), title, body, sent_by: currentUser.id, recipients: out.sent || 0
+    });
+    await logActivity(currentUser.name, `a envoyé une notification "${title}" à ${out.sent||0} cliente(s)`);
+    document.getElementById('notifTitle').value='';
+    document.getElementById('notifBody').value='';
+    msg.textContent = `Notification envoyée à ${out.sent||0} cliente(s).`;
+    renderNotificationsPanel();
+    setTimeout(()=>msg.textContent='',4000);
+  });
+
   function renderSettingsTab(){
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
     document.getElementById('setPhone').value = settings.phone || '';
@@ -1372,6 +1535,7 @@ Données des 7 derniers jours :
     document.getElementById('setPromoActive').checked = !!settings.promo_active;
     document.getElementById('setPromoPercent').value = settings.promo_percent || '';
     renderCategoriesUI();
+    renderNotificationsPanel();
     const a = salesArchive || {count:0, revenue:0, byProduct:{}};
     const topArch = Object.entries(a.byProduct||{}).sort((x,y)=>y[1]-x[1]).slice(0,5)
       .map(([n,q])=>`${n} : ${q}`).join('\n') || 'aucun';
