@@ -1482,6 +1482,8 @@ Données des 7 derniers jours :
       }
       if((isAdmin || o.claimedBy===currentUser.id) && o.status!=='traitée' && o.status!=='annulée'){
         actionBtns += `<button class="btn-mini" data-act="adjust" data-id="${o.id}">Ajuster prix</button>`;
+      }
+      if(o.status!=='annulée' && (isAdmin || (o.claimedBy===currentUser.id && o.status!=='traitée'))){
         actionBtns += `<button class="btn-mini danger" data-act="cancel" data-id="${o.id}">Annuler</button>`;
       }
       const totalCell = (o.originalTotal && o.originalTotal!==o.total)
