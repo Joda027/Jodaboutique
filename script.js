@@ -293,9 +293,13 @@
   function groupByCategory(list){
     const map = {};
     list.forEach(p=>{ const c = (p.cat && p.cat.trim()) || 'Autre'; (map[c] = map[c] || []).push(p); });
+    const toGroup = (name, items)=>{
+      const withImg = items.find(p=>p.image);
+      return {name, items, cover: withImg ? withImg.image : ''};
+    };
     const ordered = [];
-    categories.forEach(c=>{ if(map[c]){ ordered.push({name:c, items:map[c]}); delete map[c]; } });
-    Object.keys(map).sort((a,b)=>a.localeCompare(b,'fr')).forEach(c=> ordered.push({name:c, items:map[c]}));
+    categories.forEach(c=>{ if(map[c]){ ordered.push(toGroup(c, map[c])); delete map[c]; } });
+    Object.keys(map).sort((a,b)=>a.localeCompare(b,'fr')).forEach(c=> ordered.push(toGroup(c, map[c])));
     return ordered;
   }
 
@@ -306,6 +310,7 @@
 
     const s = currentSearch();
     const searchActive = s.name !== '' || s.min !== null || s.max !== null;
+    document.body.classList.toggle('searching', searchActive);
     const filtered = visible.filter(p=> matchesSearch(p, s));
 
     document.getElementById('productCountNote').textContent =
@@ -327,9 +332,12 @@
     const groups = groupByCategory(visible);
     grid.innerHTML = groups.map(g=>{
       const isOpen = !!openCategories[g.name];
+      const cover = g.cover
+        ? `<span class="cat-cover"><img src="${g.cover}" alt="" loading="lazy"></span>`
+        : `<span class="cat-cover cat-cover-icon">${iconFor(g.name)}</span>`;
       return `<div class="cat-group ${isOpen?'open':''}">
         <button class="cat-header" type="button" data-cat-toggle="${escapeHtml(g.name)}">
-          <span class="cat-title">${escapeHtml(g.name)}</span>
+          <span class="cat-head-left">${cover}<span class="cat-title">${escapeHtml(g.name)}</span></span>
           <span class="cat-meta"><span class="cat-count">${g.items.length} pièce${g.items.length>1?'s':''}</span><span class="cat-chevron">▾</span></span>
         </button>
         <div class="cat-body"><div class="grid">${g.items.map((p,i)=>productCardHtml(p,i)).join('')}</div></div>

@@ -60,6 +60,16 @@
 </header>
 
 <main id="storeView">
+  <div class="search-top">
+    <div class="wrap">
+      <div class="collection-filters">
+        <input class="text-input" id="searchName" placeholder="Rechercher un produit par nom…">
+        <input class="text-input" id="searchMin" type="number" min="0" placeholder="Prix min (GNF)">
+        <input class="text-input" id="searchMax" type="number" min="0" placeholder="Prix max (GNF)">
+        <button class="btn-ghost" id="clearSearch" type="button">Effacer</button>
+      </div>
+    </div>
+  </div>
   <section class="hero">
     <div class="wrap hero-grid">
       <div>
@@ -95,12 +105,6 @@
     <div class="section-head">
       <h2 class="section-title">La collection</h2>
       <div class="section-note" id="productCountNote">chargement…</div>
-    </div>
-    <div class="collection-filters">
-      <input class="text-input" id="searchName" placeholder="Rechercher un produit par nom…">
-      <input class="text-input" id="searchMin" type="number" min="0" placeholder="Prix min (GNF)">
-      <input class="text-input" id="searchMax" type="number" min="0" placeholder="Prix max (GNF)">
-      <button class="btn-ghost" id="clearSearch" type="button">Effacer</button>
     </div>
     <div id="productGrid">
       <div class="loading">Chargement de la collection…</div>
