@@ -869,10 +869,33 @@
       <div class="stat-card"><div class="num">${enCours}</div><div class="lbl">En cours</div></div>
       <div class="stat-card"><div class="num">${traitees}</div><div class="lbl">Traitées</div></div>
     `;
+    const rowHtml = a => `<tr><td>${a.date}</td><td>${escapeHtml(a.actor)}</td><td>${escapeHtml(a.action)}</td></tr>`;
     const body = document.getElementById('activityBody');
-    body.innerHTML = activity.map(a=>`<tr><td>${a.date}</td><td>${escapeHtml(a.actor)}</td><td>${escapeHtml(a.action)}</td></tr>`).join('')
-      || '<tr><td colspan="3">Aucune activité pour le moment.</td></tr>';
+    const first = activity.slice(0, 10);
+    const rest = activity.slice(10);
+    body.innerHTML = first.map(rowHtml).join('') || '<tr><td colspan="3">Aucune activité pour le moment.</td></tr>';
+    const moreBody = document.getElementById('activityMoreBody');
+    const moreWrap = document.getElementById('activityMoreWrap');
+    const toggle = document.getElementById('activityToggle');
+    if(rest.length){
+      moreBody.innerHTML = rest.map(rowHtml).join('');
+      toggle.style.display = '';
+      const open = moreWrap.style.display !== 'none';
+      toggle.textContent = open ? 'Masquer' : `Voir les ${rest.length} activités plus anciennes`;
+    } else {
+      moreBody.innerHTML = '';
+      moreWrap.style.display = 'none';
+      toggle.style.display = 'none';
+    }
   }
+  document.getElementById('activityToggle').addEventListener('click', ()=>{
+    const moreWrap = document.getElementById('activityMoreWrap');
+    const toggle = document.getElementById('activityToggle');
+    const willOpen = moreWrap.style.display === 'none';
+    moreWrap.style.display = willOpen ? '' : 'none';
+    const rest = activity.slice(10);
+    toggle.textContent = willOpen ? 'Masquer' : `Voir les ${rest.length} activités plus anciennes`;
+  });
 
   /* ---------- STATS TAB ---------- */
   function soldQuantities(filterFn){
@@ -1618,21 +1641,30 @@ Données des 7 derniers jours :
 
   document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
     if(!confirm('Réinitialiser toutes les ventes ?\n\nLes commandes seront effacées mais le résumé statistique cumulé sera conservé. Cette action est irréversible.')) return;
-    const newArchive = {
-      count: (salesArchive.count||0) + orders.length,
-      revenue: (salesArchive.revenue||0) + orders.reduce((s,o)=>s+o.total,0),
-      byProduct: Object.assign({}, salesArchive.byProduct||{})
-    };
-    orders.forEach(o=> o.items.forEach(it=>{
-      newArchive.byProduct[it.name] = (newArchive.byProduct[it.name]||0) + it.qty;
-    }));
-    await sb.from('sales_archive').update({count:newArchive.count, revenue:newArchive.revenue, by_product:newArchive.byProduct}).eq('id', true);
-    await sb.from('orders').delete().gte('ts', 0);
-    await logActivity(currentUser.name, "a réinitialisé l'historique des ventes (résumé conservé)");
-    await Promise.all([loadOrders(), loadSalesArchive()]);
-    document.getElementById('resetMsg').textContent = 'Historique réinitialisé. Résumé conservé.';
-    renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); renderOrdersTab();
-    setTimeout(()=>document.getElementById('resetMsg').textContent='',3000);
+    const msg = document.getElementById('resetMsg');
+    msg.textContent = 'Réinitialisation en cours…';
+    try{
+      const newArchive = {
+        count: (salesArchive.count||0) + orders.length,
+        revenue: (salesArchive.revenue||0) + orders.reduce((s,o)=>s+Number(o.total||0),0),
+        byProduct: Object.assign({}, salesArchive.byProduct||{})
+      };
+      orders.forEach(o=> (Array.isArray(o.items)?o.items:[]).forEach(it=>{
+        newArchive.byProduct[it.name] = (newArchive.byProduct[it.name]||0) + Number(it.qty||0);
+      }));
+      const { error: aErr } = await sb.from('sales_archive')
+        .update({count:newArchive.count, revenue:newArchive.revenue, by_product:newArchive.byProduct}).eq('id', true);
+      if(aErr){ msg.textContent = "Erreur (sauvegarde du résumé) : " + aErr.message; return; }
+      const { error: dErr } = await sb.from('orders').delete().gte('ts', 0);
+      if(dErr){ msg.textContent = "Erreur (suppression des commandes) : " + dErr.message; return; }
+      await logActivity(currentUser.name, "a réinitialisé l'historique des ventes (résumé conservé)");
+      await Promise.all([loadOrders(), loadSalesArchive()]);
+      msg.textContent = 'Historique réinitialisé. Résumé conservé.';
+      renderOverview(); renderStatsTab(); renderFinancesTab(); renderSettingsTab(); renderOrdersTab();
+      setTimeout(()=>{ msg.textContent=''; }, 4000);
+    }catch(e){
+      msg.textContent = 'Erreur : ' + (e && e.message ? e.message : e);
+    }
   });
 
   document.getElementById('adminChangePasswordBtn').addEventListener('click', async ()=>{
