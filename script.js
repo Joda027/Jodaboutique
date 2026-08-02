@@ -163,8 +163,8 @@
     return num ? `https://wa.me/${num}?text=${txt}` : '';
   }
   /* ---------- NOTIFICATIONS PUSH (client) ---------- */
-  // Clé publique VAPID : à remplacer par la vôtre (voir README notifications).
-  const VAPID_PUBLIC_KEY = '';
+  // Clé publique VAPID (voir NOTIFICATIONS.md). La clé privée reste côté serveur.
+  const VAPID_PUBLIC_KEY = 'BA5wOVE-Es3Aj3HQnTwfBZYUTIqi9CaxK6D0Kbj9cXWQVg_-iU5HrpQhehXv8NWRnmADgOB2MMizeAb4Tb2AzaE';
   let swRegistration = null;
 
   function pushSupported(){
