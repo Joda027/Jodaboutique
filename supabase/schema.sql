@@ -46,7 +46,7 @@ create table if not exists orders (
   items jsonb not null,
   total numeric not null,
   original_total numeric,
-  status text not null default 'nouvelle' check (status in ('nouvelle','en cours','traitée')),
+  status text not null default 'nouvelle' check (status in ('nouvelle','en cours','traitée','annulée')),
   claimed_by uuid references team_members(id) on delete set null,
   created_at timestamptz not null default now()
 );
@@ -93,6 +93,7 @@ create table if not exists settings (
   facebook text default '',
   promo_active boolean default false,
   promo_percent numeric default 0,
+  promo_ends_at timestamptz,
   categories jsonb default '[]'::jsonb
 );
 insert into settings (id, whatsapp) values (true, '') on conflict (id) do nothing;
@@ -213,6 +214,7 @@ declare
   v_unit_price numeric;
   v_promo_active boolean := false;
   v_promo_percent numeric := 0;
+  v_promo_ends_at timestamptz;
 begin
   if p_customer is null or length(trim(p_customer)) = 0 then
     raise exception 'Nom du client requis';
@@ -221,9 +223,13 @@ begin
     raise exception 'Le panier est vide';
   end if;
 
-  select coalesce(promo_active,false), coalesce(promo_percent,0)
-    into v_promo_active, v_promo_percent
+  select coalesce(promo_active,false), coalesce(promo_percent,0), promo_ends_at
+    into v_promo_active, v_promo_percent, v_promo_ends_at
     from settings where id = true;
+
+  if v_promo_ends_at is not null and v_promo_ends_at <= now() then
+    v_promo_active := false;
+  end if;
 
   for v_item in select * from jsonb_array_elements(p_items) loop
     v_qty := (v_item->>'qty')::integer;
