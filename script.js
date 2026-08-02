@@ -102,12 +102,47 @@
     offlineSales = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent,categories').eq('id', true).maybeSingle();
+    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent,promo_ends_at,categories').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
-    settings = data || {whatsapp:'', phone:'', facebook:'', promo_active:false, promo_percent:0, categories:[]};
+    settings = data || {whatsapp:'', phone:'', facebook:'', promo_active:false, promo_percent:0, promo_ends_at:null, categories:[]};
     categories = Array.isArray(settings.categories) ? settings.categories : [];
   }
-  function promoActive(){ return !!settings.promo_active && Number(settings.promo_percent) > 0; }
+  function promoActive(){
+    if(!settings.promo_active || Number(settings.promo_percent) <= 0) return false;
+    if(settings.promo_ends_at && new Date(settings.promo_ends_at).getTime() <= Date.now()) return false;
+    return true;
+  }
+
+  let promoCountdownTimer = null;
+  function renderPromoCountdown(){
+    const el = document.getElementById('promoCountdown');
+    if(!el) return;
+    if(promoCountdownTimer){ clearInterval(promoCountdownTimer); promoCountdownTimer = null; }
+    if(!promoActive() || !settings.promo_ends_at){
+      el.style.display = 'none';
+      return;
+    }
+    const endTs = new Date(settings.promo_ends_at).getTime();
+    const textEl = document.getElementById('promoCountdownText');
+    const tick = () => {
+      const diff = endTs - Date.now();
+      if(diff <= 0){
+        el.style.display = 'none';
+        clearInterval(promoCountdownTimer); promoCountdownTimer = null;
+        return;
+      }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      const pad = n => String(n).padStart(2,'0');
+      const parts = days > 0 ? `${days}j ${pad(hours)}h ${pad(mins)}m` : `${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+      textEl.textContent = `-${settings.promo_percent}% · Fin dans ${parts}`;
+    };
+    el.style.display = 'flex';
+    tick();
+    promoCountdownTimer = setInterval(tick, 1000);
+  }
   function effectivePrice(price){
     if(!promoActive()) return Number(price);
     return Math.round(Number(price) * (1 - Number(settings.promo_percent)/100));
@@ -128,6 +163,7 @@
     renderCategoriesUI();
     renderStore();
     renderCarousel(); renderHeroShowcase();
+    renderPromoCountdown();
 
     const { data:{ session } } = await sb.auth.getSession();
     if(session) await handleAuthSession();
@@ -866,6 +902,7 @@
     const nouvelles = orders.filter(o=>o.status==='nouvelle').length;
     const enCours = orders.filter(o=>o.status==='en cours').length;
     const traitees = orders.filter(o=>o.status==='traitée').length;
+    const annulees = orders.filter(o=>o.status==='annulée').length;
     const rupture = products.filter(p=>Number(p.stock)<=0).length;
     const pending = products.filter(p=>!isApproved(p)).length;
     statGrid.innerHTML = `
@@ -875,6 +912,7 @@
       <div class="stat-card"><div class="num">${nouvelles}</div><div class="lbl">Commandes nouvelles</div></div>
       <div class="stat-card"><div class="num">${enCours}</div><div class="lbl">En cours</div></div>
       <div class="stat-card"><div class="num">${traitees}</div><div class="lbl">Traitées</div></div>
+      <div class="stat-card"><div class="num">${annulees}</div><div class="lbl">Annulées</div></div>
     `;
     const rowHtml = a => `<tr><td>${a.date}</td><td>${escapeHtml(a.actor)}</td><td>${escapeHtml(a.action)}</td></tr>`;
     const body = document.getElementById('activityBody');
@@ -908,6 +946,7 @@
   function soldQuantities(filterFn){
     const map = {};
     orders.forEach(o=>{
+      if(o.status==='annulée') return;
       if(filterFn && !filterFn(o)) return;
       o.items.forEach(it=>{
         if(!map[it.name]) map[it.name] = {qty:0, revenue:0};
@@ -931,7 +970,7 @@
   function renderStatsTab(){
     const now = Date.now();
     const weekAgo = now - 7*86400000;
-    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo);
+    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && o.status!=='annulée');
     const weekOffline = offlineSales.filter(o=> o.ts && o.ts >= weekAgo).reduce((s,o)=>s+Number(o.amount||0),0);
     const weekRevenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0) + weekOffline;
     const weekItems = weekOrders.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
@@ -996,7 +1035,7 @@
     const weekSales = mineWeek.filter(o=>o.status==='traitée').reduce((s,o)=>s+o.total,0);
     const monthCom = commissionOf(mineMonth);
     const weekCom = commissionOf(mineWeek);
-    const pending = mineMonth.filter(o=>o.status!=='traitée').length;
+    const pending = mineMonth.filter(o=>o.status!=='traitée' && o.status!=='annulée').length;
 
     document.getElementById('myStatsGrid').innerHTML = `
       <div class="stat-card"><div class="num">${mineWeek.length}</div><div class="lbl">Commandes prises (7 jours)</div></div>
@@ -1007,7 +1046,7 @@
     `;
 
     const weekMap = {};
-    mineWeek.forEach(o=> o.items.forEach(it=>{ weekMap[it.name] = (weekMap[it.name]||0) + it.qty; }));
+    mineWeek.filter(o=>o.status!=='annulée').forEach(o=> o.items.forEach(it=>{ weekMap[it.name] = (weekMap[it.name]||0) + it.qty; }));
     barChart(document.getElementById('myWeeklySales'),
       Object.entries(weekMap).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
 
@@ -1015,13 +1054,13 @@
     document.getElementById('myOrdersEmpty').style.display = mineMonth.length ? 'none' : 'block';
     body.innerHTML = mineMonth.map(o=>{
       const com = o.status==='traitée' ? Math.round(o.total*COMMISSION_RATE) : 0;
-      const pillClass = o.status==='nouvelle' ? 'new' : (o.status==='en cours' ? 'progress' : 'done');
+      const pillClass = o.status==='nouvelle' ? 'new' : (o.status==='en cours' ? 'progress' : (o.status==='annulée' ? 'cancel' : 'done'));
       return `<tr>
         <td>${new Date(o.ts).toLocaleString('fr-FR')}</td>
         <td>${escapeHtml(o.customer)}</td>
         <td>${money(o.total)}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
-        <td>${o.status==='traitée' ? money(com) : '<span class="section-note">après traitement</span>'}</td>
+        <td>${o.status==='traitée' ? money(com) : (o.status==='annulée' ? '<span class="section-note">annulée</span>' : '<span class="section-note">après traitement</span>')}</td>
       </tr>`;
     }).join('');
   }
@@ -1067,7 +1106,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
 
   function monthFinancials(refTs){
     const mk = monthKey(refTs);
-    const monthOrders = orders.filter(o=> o.ts && monthKey(o.ts)===mk);
+    const monthOrders = orders.filter(o=> o.ts && monthKey(o.ts)===mk && o.status!=='annulée');
     const onsiteRevenue = monthOrders.reduce((s,o)=>s+Number(o.total||0),0);
     const monthOffline = offlineSales.filter(o=> monthKey(o.ts)===mk);
     const offlineTotal = monthOffline.reduce((s,o)=>s+Number(o.amount||0),0);
@@ -1239,7 +1278,7 @@ Données du mois (${monthLabel(Date.now())}) :
     box.textContent = 'Analyse en cours…';
     const now = Date.now();
     const weekAgo = now - 7*86400000;
-    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo);
+    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && o.status!=='annulée');
     const weekOfflineTotal = offlineSales.filter(o=> o.ts >= weekAgo).reduce((s,o)=>s+Number(o.amount||0),0);
     const revenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0) + weekOfflineTotal;
     const weekExpenses = expenses.filter(e=> e.ts >= weekAgo);
@@ -1433,7 +1472,7 @@ Données des 7 derniers jours :
     const oBody = document.getElementById('ordersBody');
     document.getElementById('ordersEmpty').style.display = visible.length ? 'none' : 'block';
     oBody.innerHTML = visible.map(o=>{
-      const pillClass = o.status==='nouvelle' ? 'new' : (o.status==='en cours' ? 'progress' : 'done');
+      const pillClass = o.status==='nouvelle' ? 'new' : (o.status==='en cours' ? 'progress' : (o.status==='annulée' ? 'cancel' : 'done'));
       let actionBtns = '';
       if(o.status==='nouvelle' && (isAdmin || o.claimedBy===null)){
         actionBtns += `<button class="btn-mini" data-act="claim" data-id="${o.id}">Prendre en charge</button>`;
@@ -1441,8 +1480,9 @@ Données des 7 derniers jours :
       if(o.status==='en cours' && (isAdmin || o.claimedBy===currentUser.id)){
         actionBtns += `<button class="btn-mini" data-act="done" data-id="${o.id}">Marquer traitée</button>`;
       }
-      if((isAdmin || o.claimedBy===currentUser.id) && o.status!=='traitée'){
+      if((isAdmin || o.claimedBy===currentUser.id) && o.status!=='traitée' && o.status!=='annulée'){
         actionBtns += `<button class="btn-mini" data-act="adjust" data-id="${o.id}">Ajuster prix</button>`;
+        actionBtns += `<button class="btn-mini danger" data-act="cancel" data-id="${o.id}">Annuler</button>`;
       }
       const totalCell = (o.originalTotal && o.originalTotal!==o.total)
         ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
@@ -1481,6 +1521,17 @@ Données des 7 derniers jours :
           if(isNaN(newTotal) || newTotal<0){ alert('Montant invalide.'); return; }
           const { error } = await sb.from('orders').update({ original_total: o.originalTotal || o.total, total:newTotal }).eq('id', o.id);
           if(!error) await logActivity(currentUser.name, 'a ajusté le prix de la commande de '+o.customer+' à '+money(newTotal));
+        } else if(btn.dataset.act==='cancel'){
+          if(!confirm('Annuler la commande de '+o.customer+' ? Les articles seront remis en stock et cette commande ne comptera plus dans les finances.')) return;
+          const { error } = await sb.from('orders').update({status:'annulée'}).eq('id', o.id);
+          if(!error){
+            for(const it of o.items){
+              const p = products.find(x=>x.id===it.id);
+              if(p) await sb.from('products').update({stock: Number(p.stock) + Number(it.qty)}).eq('id', it.id);
+            }
+            await logActivity(currentUser.name, 'a annulé la commande de '+o.customer);
+            await loadProducts();
+          }
         }
         await loadOrders();
         renderOrdersTab(); if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); } else renderMyStatsTab();
@@ -1641,12 +1692,19 @@ Données des 7 derniers jours :
     setTimeout(()=>msg.textContent='',4000);
   });
 
+  function toLocalDatetimeInput(ts){
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2,'0');
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+
   function renderSettingsTab(){
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';
     document.getElementById('setPromoActive').checked = !!settings.promo_active;
     document.getElementById('setPromoPercent').value = settings.promo_percent || '';
+    document.getElementById('setPromoEndsAt').value = settings.promo_ends_at ? toLocalDatetimeInput(settings.promo_ends_at) : '';
     renderCategoriesUI();
     renderNotificationsPanel();
     const a = salesArchive || {count:0, revenue:0, byProduct:{}};
@@ -1675,13 +1733,16 @@ Données des 7 derniers jours :
   document.getElementById('savePromoBtn').addEventListener('click', async ()=>{
     const active = document.getElementById('setPromoActive').checked;
     const percent = Number(document.getElementById('setPromoPercent').value) || 0;
+    const endsAtRaw = document.getElementById('setPromoEndsAt').value;
     const msg = document.getElementById('promoMsg');
     if(active && (percent <= 0 || percent >= 100)){ msg.textContent = 'Indiquez un pourcentage valide (entre 1 et 99).'; return; }
-    await sb.from('settings').update({promo_active: active, promo_percent: percent}).eq('id', true);
+    const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
+    if(active && endsAt && new Date(endsAt).getTime() <= Date.now()){ msg.textContent = 'La date de fin doit être dans le futur.'; return; }
+    await sb.from('settings').update({promo_active: active, promo_percent: percent, promo_ends_at: endsAt}).eq('id', true);
     await loadSettings();
     await logActivity(currentUser.name, active ? `a activé une promotion de ${percent}%` : 'a désactivé la promotion');
     msg.textContent = 'Promotion mise à jour.';
-    renderStore(); renderCarousel(); renderHeroShowcase(); renderCart();
+    renderStore(); renderCarousel(); renderHeroShowcase(); renderCart(); renderPromoCountdown();
     setTimeout(()=>msg.textContent='',2000);
   });
 

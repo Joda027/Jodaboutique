@@ -401,6 +401,9 @@
           </label>
           <label style="font-size:12px;color:var(--muted);display:block;margin:12px 0 6px;">Pourcentage de réduction</label>
           <input class="text-input" id="setPromoPercent" type="number" min="1" max="90" placeholder="ex: 20">
+          <label style="font-size:12px;color:var(--muted);display:block;margin:12px 0 6px;">Fin de la promotion (facultatif)</label>
+          <p class="section-note" style="margin-bottom:12px;">Si une date est définie, un compteur s'affiche en permanence sur la boutique jusqu'à cette date, puis la promotion s'arrête automatiquement. Laissez vide pour une promotion sans date de fin.</p>
+          <input class="text-input" id="setPromoEndsAt" type="datetime-local">
           <button class="btn-mini" id="savePromoBtn">Enregistrer</button>
           <div class="status-msg" id="promoMsg"></div>
         </div>
@@ -464,6 +467,12 @@
     <button class="btn-primary" style="width:100%;" id="checkoutBtn">Commander</button>
     <div class="status-msg" id="checkoutMsg"></div>
   </div>
+</div>
+
+<!-- PROMOTION COUNTDOWN (pinned, visible partout) -->
+<div class="promo-countdown" id="promoCountdown" style="display:none;">
+  <span class="pc-icon">🔥</span>
+  <span id="promoCountdownText"></span>
 </div>
 
 <!-- CHATBOT -->
