@@ -296,6 +296,21 @@
           <div class="status-msg" id="expMsg"></div>
         </div>
         <div class="panel">
+          <h4>Ajouter une vente hors site</h4>
+          <p class="section-note" style="margin-bottom:12px;">Enregistrez ici les ventes faites en dehors du site (en main propre, réseaux sociaux…) pour qu'elles soient comptées dans le chiffre d'affaires et les statistiques.</p>
+          <div class="fin-form">
+            <input class="text-input" style="margin:0;" id="offSaleLabel" placeholder="Description (ex: Collier vendu à Mariam)">
+            <input class="text-input" style="margin:0;" id="offSaleAmount" placeholder="Montant vendu (GNF)" type="number">
+            <button class="btn-mini" id="addOffSaleBtn" style="height:38px;">Ajouter</button>
+          </div>
+          <div class="status-msg" id="offSaleMsg"></div>
+          <div class="table-scroll" style="margin-top:16px;"><table class="admin-table">
+            <thead><tr><th>Date</th><th>Description</th><th>Montant</th><th></th></tr></thead>
+            <tbody id="offSalesBody"></tbody>
+          </table></div>
+          <div class="status-msg" id="offSalesEmpty" style="display:none;">Aucune vente hors site ce mois-ci.</div>
+        </div>
+        <div class="panel">
           <h4>Bilan du mois en cours</h4>
           <div class="stat-grid" id="finGrid"></div>
           <div class="table-scroll"><table class="admin-table">

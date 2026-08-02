@@ -27,6 +27,7 @@
   let likes = {};
   let traffic = {};
   let expenses = [];
+  let offlineSales = [];
   let settings = {};
   let categories = [];
   let salesArchive = {count:0, revenue:0, byProduct:{}};
@@ -94,6 +95,12 @@
     if(error) console.error('loadExpenses', error);
     expenses = data || [];
   }
+  async function loadOfflineSales(){
+    if(!currentUser || currentUser.role!=='admin'){ offlineSales = []; return; }
+    const { data, error } = await sb.from('offline_sales').select('id,ts,label,amount');
+    if(error) console.error('loadOfflineSales', error);
+    offlineSales = data || [];
+  }
   async function loadSettings(){
     const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent,categories').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
@@ -135,7 +142,7 @@
       await loadProducts();
       await Promise.all([loadTeam(), loadOrders()]);
       if(currentUser.role==='admin'){
-        await Promise.all([loadActivity(), loadExpenses(), loadSettings(), loadSalesArchive(), loadInvites(), loadTraffic()]);
+        await Promise.all([loadActivity(), loadExpenses(), loadOfflineSales(), loadSettings(), loadSalesArchive(), loadInvites(), loadTraffic()]);
       }
       renderLoggedArea();
       startInactivityTimer();
@@ -925,7 +932,8 @@
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo);
-    const weekRevenue = weekOrders.reduce((s,o)=>s+o.total,0);
+    const weekOffline = offlineSales.filter(o=> o.ts && o.ts >= weekAgo).reduce((s,o)=>s+Number(o.amount||0),0);
+    const weekRevenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0) + weekOffline;
     const weekItems = weekOrders.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
     const totalStock = products.reduce((s,p)=>s+Number(p.stock||0),0);
     const curWeek = weekKey(now);
@@ -1060,10 +1068,13 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
   function monthFinancials(refTs){
     const mk = monthKey(refTs);
     const monthOrders = orders.filter(o=> o.ts && monthKey(o.ts)===mk);
-    const revenue = monthOrders.reduce((s,o)=>s+o.total,0);
+    const onsiteRevenue = monthOrders.reduce((s,o)=>s+Number(o.total||0),0);
+    const monthOffline = offlineSales.filter(o=> monthKey(o.ts)===mk);
+    const offlineTotal = monthOffline.reduce((s,o)=>s+Number(o.amount||0),0);
+    const revenue = onsiteRevenue + offlineTotal;
     const monthExpenses = expenses.filter(e=> monthKey(e.ts)===mk);
     const totalExp = monthExpenses.reduce((s,e)=>s+Number(e.amount),0);
-    return {mk, monthOrders, revenue, monthExpenses, totalExp, profit: revenue-totalExp};
+    return {mk, monthOrders, onsiteRevenue, monthOffline, offlineTotal, revenue, monthExpenses, totalExp, profit: revenue-totalExp};
   }
 
   function renderFinancesTab(){
@@ -1081,6 +1092,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
 
     document.getElementById('finGrid').innerHTML = `
       <div class="stat-card"><div class="num">${f.revenue.toLocaleString('fr-FR')}</div><div class="lbl">Ventes du mois (GNF)</div></div>
+      <div class="stat-card"><div class="num">${f.offlineTotal.toLocaleString('fr-FR')}</div><div class="lbl">dont ventes hors site (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses du mois (GNF)</div></div>
       <div class="stat-card"><div class="num">${totalCom.toLocaleString('fr-FR')}</div><div class="lbl">Commissions (10%)</div></div>
       <div class="stat-card"><div class="num" style="color:${netProfit>=0?'var(--navy)':'var(--wine)'}">${netProfit.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net (GNF)</div></div>
@@ -1112,7 +1124,40 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
         renderFinancesTab();
       });
     });
+
+    const offBody = document.getElementById('offSalesBody');
+    document.getElementById('offSalesEmpty').style.display = f.monthOffline.length ? 'none' : 'block';
+    offBody.innerHTML = f.monthOffline.map(o=>`
+      <tr>
+        <td>${new Date(o.ts).toLocaleDateString('fr-FR')}</td>
+        <td>${escapeHtml(o.label)}</td>
+        <td>${money(o.amount)}</td>
+        <td><button class="btn-mini danger" data-off="${o.id}">Retirer</button></td>
+      </tr>`).join('');
+    offBody.querySelectorAll('button[data-off]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        await sb.from('offline_sales').delete().eq('id', btn.dataset.off);
+        await loadOfflineSales();
+        renderFinancesTab(); renderStatsTab();
+      });
+    });
   }
+
+  document.getElementById('addOffSaleBtn').addEventListener('click', async ()=>{
+    const label = document.getElementById('offSaleLabel').value.trim();
+    const amount = Number(document.getElementById('offSaleAmount').value);
+    const msg = document.getElementById('offSaleMsg');
+    if(!label || !amount){ msg.textContent = 'Renseignez une description et un montant.'; return; }
+    const { error } = await sb.from('offline_sales').insert({id:'os'+Date.now(), ts:Date.now(), label, amount, created_by: currentUser.id});
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+    await logActivity(currentUser.name, 'a enregistré une vente hors site : '+label+' ('+money(amount)+')');
+    document.getElementById('offSaleLabel').value='';
+    document.getElementById('offSaleAmount').value='';
+    msg.textContent = 'Vente hors site enregistrée.';
+    setTimeout(()=>msg.textContent='',2000);
+    await loadOfflineSales();
+    renderFinancesTab(); renderStatsTab();
+  });
 
   document.getElementById('addExpenseBtn').addEventListener('click', async ()=>{
     const label = document.getElementById('expLabel').value.trim();
@@ -1160,7 +1205,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     const prompt = `Tu es l'analyste financière de Joda Boutique, une boutique de bijoux et accessoires en Guinée (monnaie : GNF). Rédige un rapport mensuel clair et concret en français, destiné à la gérante. Utilise uniquement les données fournies, sans en inventer. Structure : 1) Résumé du mois, 2) Ce qui a bien marché, 3) Ce qui a moins marché ou points d'attention, 4) Budget (ventes, dépenses, commissions, résultat net), 5) Recommandations et projections simples pour le mois prochain. Reste concis (300 mots max), ton professionnel mais accessible, sans tableau ni markdown, juste des paragraphes et des tirets simples.
 
 Données du mois (${monthLabel(Date.now())}) :
-- Chiffre d'affaires : ${f.revenue.toLocaleString('fr-FR')} GNF sur ${f.monthOrders.length} commandes
+- Chiffre d'affaires total : ${f.revenue.toLocaleString('fr-FR')} GNF (${f.onsiteRevenue.toLocaleString('fr-FR')} GNF via le site sur ${f.monthOrders.length} commandes + ${f.offlineTotal.toLocaleString('fr-FR')} GNF de ventes hors site)
 - Dépenses totales : ${f.totalExp.toLocaleString('fr-FR')} GNF — détail : ${expList}
 - Commissions des assistantes (10% des ventes traitées) : ${totalComR.toLocaleString('fr-FR')} GNF — détail : ${comDetail}
 - Résultat net (ventes − dépenses − commissions) : ${(f.profit - totalComR).toLocaleString('fr-FR')} GNF
@@ -1195,7 +1240,8 @@ Données du mois (${monthLabel(Date.now())}) :
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo);
-    const revenue = weekOrders.reduce((s,o)=>s+o.total,0);
+    const weekOfflineTotal = offlineSales.filter(o=> o.ts >= weekAgo).reduce((s,o)=>s+Number(o.amount||0),0);
+    const revenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0) + weekOfflineTotal;
     const weekExpenses = expenses.filter(e=> e.ts >= weekAgo);
     const totalExp = weekExpenses.reduce((s,e)=>s+Number(e.amount),0);
     const soldMap = soldQuantities(o=> o.ts && o.ts >= weekAgo);
@@ -1208,7 +1254,7 @@ Données du mois (${monthLabel(Date.now())}) :
     const prompt = `Tu es l'analyste de Joda Boutique, une boutique de bijoux et accessoires en Guinée (monnaie : GNF). Rédige un rapport hebdomadaire court et concret en français, destiné à la gérante, sur les 7 derniers jours. Utilise uniquement les données fournies, sans en inventer. Structure : 1) Résumé de la semaine, 2) Ce qui a bien marché, 3) Points d'attention, 4) Une recommandation simple pour la semaine prochaine. Maximum 180 mots, paragraphes simples sans markdown.
 
 Données des 7 derniers jours :
-- Chiffre d'affaires : ${revenue.toLocaleString('fr-FR')} GNF sur ${weekOrders.length} commandes
+- Chiffre d'affaires : ${revenue.toLocaleString('fr-FR')} GNF (${weekOrders.length} commandes sur le site + ${weekOfflineTotal.toLocaleString('fr-FR')} GNF de ventes hors site)
 - Dépenses : ${totalExp.toLocaleString('fr-FR')} GNF
 - Meilleures ventes : ${topSold}
 - Stocks bas ou en rupture : ${lowStock}

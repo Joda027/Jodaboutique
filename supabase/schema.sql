@@ -71,6 +71,14 @@ create table if not exists expenses (
   created_by uuid references team_members(id) on delete set null
 );
 
+create table if not exists offline_sales (
+  id text primary key,
+  ts bigint not null,
+  label text not null,
+  amount numeric not null,
+  created_by uuid references team_members(id) on delete set null
+);
+
 create table if not exists activity_log (
   id bigint generated always as identity primary key,
   ts timestamptz not null default now(),
@@ -300,6 +308,7 @@ alter table orders enable row level security;
 alter table likes enable row level security;
 alter table traffic enable row level security;
 alter table expenses enable row level security;
+alter table offline_sales enable row level security;
 alter table activity_log enable row level security;
 alter table settings enable row level security;
 alter table sales_archive enable row level security;
@@ -336,6 +345,9 @@ create policy "team can view traffic" on traffic for select using (is_team_membe
 
 -- expenses (réservé à l'admin)
 create policy "admin manages expenses" on expenses for all using (is_admin()) with check (is_admin());
+
+-- offline_sales (réservé à l'admin)
+create policy "admin manages offline sales" on offline_sales for all using (is_admin()) with check (is_admin());
 
 -- activity_log
 create policy "team can insert activity" on activity_log for insert with check (is_team_member());
