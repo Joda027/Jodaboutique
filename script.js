@@ -120,7 +120,7 @@
     renderSubscribeMini();
     renderCategoriesUI();
     renderStore();
-    renderCarousel();
+    renderCarousel(); renderHeroShowcase();
 
     const { data:{ session } } = await sb.auth.getSession();
     if(session) await handleAuthSession();
@@ -484,6 +484,21 @@
     renderStore();
   });
 
+  /* ---------- HERO SHOWCASE (défilement continu du catalogue) ---------- */
+  function renderHeroShowcase(){
+    const showcase = document.getElementById('heroShowcase');
+    const track = document.getElementById('hsTrack');
+    if(!showcase || !track) return;
+    const imgs = products.filter(p=> p.image && isApproved(p)).map(p=>p.image);
+    if(imgs.length === 0){ showcase.style.display = 'none'; return; }
+    showcase.style.display = '';
+    // liste dupliquée => boucle sans coupure (l'animation translate de -50%).
+    const html = imgs.map(src=>`<img class="hs-img" src="${src}" alt="" loading="lazy">`).join('');
+    track.innerHTML = html + html;
+    // vitesse proportionnelle au nombre d'images (rythme constant).
+    track.style.animationDuration = Math.max(18, imgs.length * 4) + 's';
+  }
+
   /* ---------- FEATURED CAROUSEL ---------- */
   let carouselTimer = null;
   let carouselItems = [];
@@ -625,7 +640,7 @@
     }
     await loadProducts();
     cart = {};
-    renderCart(); renderStore(); renderCarousel();
+    renderCart(); renderStore(); renderCarousel(); renderHeroShowcase();
     if(currentUser){ await loadOrders(); renderLoggedArea(); }
 
     // Abonnement au suivi de commande (si la cliente l'a accepté).
@@ -1293,14 +1308,14 @@ Données des 7 derniers jours :
               await sb.from('products').update({image}).eq('id', p.id);
               await logActivity(currentUser.name, 'a ajouté une photo pour "'+p.name+'"');
               await loadProducts();
-              renderProductsTab(); renderStore(); renderCarousel();
+              renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
             }catch(e){ alert("La photo n'a pas pu être chargée."); }
           };
           input.click();
           return;
         }
         await loadProducts();
-        renderProductsTab(); renderStore(); renderCarousel(); if(currentUser.role==='admin') renderOverview();
+        renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase(); if(currentUser.role==='admin') renderOverview();
       });
     });
   }
@@ -1338,7 +1353,7 @@ Données des 7 derniers jours :
     msg.textContent = isAdminAdd ? '"'+name+'" ajouté et publié.' : '"'+name+'" envoyé pour approbation. Il sera visible des clients après validation de l\'administratrice.';
     setTimeout(()=>msg.textContent='',4000);
     await loadProducts();
-    renderProductsTab(); renderStore(); renderCarousel(); if(currentUser.role==='admin') renderOverview();
+    renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase(); if(currentUser.role==='admin') renderOverview();
   });
 
   function renderOrdersTab(){
@@ -1597,7 +1612,7 @@ Données des 7 derniers jours :
     await loadSettings();
     await logActivity(currentUser.name, active ? `a activé une promotion de ${percent}%` : 'a désactivé la promotion');
     msg.textContent = 'Promotion mise à jour.';
-    renderStore(); renderCarousel(); renderCart();
+    renderStore(); renderCarousel(); renderHeroShowcase(); renderCart();
     setTimeout(()=>msg.textContent='',2000);
   });
 
