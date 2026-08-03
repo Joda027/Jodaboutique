@@ -177,7 +177,10 @@
       <div id="tab-overview" class="tab-content" style="display:none;">
         <div class="stat-grid" id="statGrid"></div>
         <div class="panel">
-          <h4>Journal d'activité</h4>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <h4 style="margin:0;">Journal d'activité</h4>
+            <button class="btn-mini danger" id="clearActivityBtn">Vider le journal</button>
+          </div>
           <table class="admin-table">
             <thead><tr><th>Date</th><th>Qui</th><th>Action</th></tr></thead>
             <tbody id="activityBody"></tbody>
@@ -186,6 +189,7 @@
             <table class="admin-table"><tbody id="activityMoreBody"></tbody></table>
           </div>
           <button class="btn-mini" id="activityToggle" style="display:none; margin-top:12px;"></button>
+          <div class="status-msg" id="clearActivityMsg"></div>
         </div>
       </div>
 

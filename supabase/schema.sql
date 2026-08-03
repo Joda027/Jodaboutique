@@ -410,6 +410,7 @@ create policy "admin manages offline sales" on offline_sales for all using (is_a
 -- activity_log
 create policy "team can insert activity" on activity_log for insert with check (is_team_member());
 create policy "admin can view activity" on activity_log for select using (is_admin());
+create policy "admin can delete activity" on activity_log for delete using (is_admin());
 
 -- settings (numéro WhatsApp visible publiquement, modifiable par l'admin)
 create policy "public can view settings" on settings for select using (true);

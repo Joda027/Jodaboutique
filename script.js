@@ -1740,6 +1740,9 @@ Données des 7 derniers jours :
       if(o.status!=='annulée' && (isAdmin || (o.claimedBy===currentUser.id && o.status!=='traitée'))){
         actionBtns += `<button class="btn-mini danger" data-act="cancel" data-id="${o.id}">Annuler</button>`;
       }
+      if(isAdmin){
+        actionBtns += `<button class="btn-mini danger" data-act="delete-order" data-id="${o.id}">Supprimer</button>`;
+      }
       const totalCell = (o.originalTotal && o.originalTotal!==o.total)
         ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
         : money(o.total);
@@ -1812,6 +1815,11 @@ Données des 7 derniers jours :
             await loadProducts();
             notifyTeam('order_cancelled', o.id);
           }
+        } else if(btn.dataset.act==='delete-order'){
+          if(currentUser.role!=='admin') return;
+          if(!confirm('Supprimer définitivement la commande de '+o.customer+' ('+money(o.total)+') ? Cette action est irréversible et ne remet pas les articles en stock.')) return;
+          const { error } = await sb.from('orders').delete().eq('id', o.id);
+          if(!error) await logActivity(currentUser.name, 'a supprimé la commande de '+o.customer);
         }
         await loadOrders();
         renderOrdersTab(); if(currentUser.role==='admin'){ renderOverview(); renderStatsTab(); renderFinancesTab(); } else renderMyStatsTab();
@@ -2056,6 +2064,18 @@ Données des 7 derniers jours :
     renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
     btn.disabled = false;
     msg.textContent = done===total ? `${done} photo(s) converties avec succès.` : `${done} sur ${total} converties — réessayez pour les autres (vérifiez votre connexion).`;
+  });
+
+  document.getElementById('clearActivityBtn').addEventListener('click', async ()=>{
+    if(!currentUser || currentUser.role!=='admin') return;
+    if(!confirm("Vider tout le journal d'activité ? Cette action est irréversible.")) return;
+    const msg = document.getElementById('clearActivityMsg');
+    const { error } = await sb.from('activity_log').delete().gte('id', 0);
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+    await logActivity(currentUser.name, "a vidé le journal d'activité");
+    renderOverview();
+    msg.textContent = 'Journal vidé.';
+    setTimeout(()=>msg.textContent='', 3000);
   });
 
   document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
