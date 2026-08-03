@@ -165,6 +165,9 @@
     renderCarousel(); renderHeroShowcase();
     renderPromoCountdown();
 
+    const sharedProductId = new URLSearchParams(location.search).get('p');
+    if(sharedProductId) scrollToProduct(sharedProductId);
+
     const { data:{ session } } = await sb.auth.getSession();
     if(session) await handleAuthSession();
   }
@@ -441,8 +444,9 @@
       ? `<span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>
          <div class="price-old-row"><span class="price-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
       : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
-    return `<div class="tag-card" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
+    return `<div class="tag-card" id="prod-${p.id}" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
       <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
+      <button class="share-btn" data-share="${p.id}" title="Partager cette pièce">🔗</button>
       ${media}
       <h3>${escapeHtml(p.name)}</h3>
       <div class="cat">${escapeHtml(p.cat)}</div>
@@ -465,6 +469,28 @@
         if(!error) likes[id] = data;
         trackClick();
         renderStore();
+      });
+    });
+    root.querySelectorAll('button[data-share]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.share;
+        const p = products.find(x=>x.id===id);
+        const url = `${location.origin}/produit/${encodeURIComponent(id)}`;
+        const shareData = { title: p ? p.name+' — Joda Boutique' : 'Joda Boutique', url };
+        if(navigator.share){
+          try{ await navigator.share(shareData); }catch(e){ /* partage annulé */ }
+          return;
+        }
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          try{
+            await navigator.clipboard.writeText(url);
+            const original = btn.textContent;
+            btn.textContent = '✓';
+            setTimeout(()=>{ btn.textContent = original; }, 1500);
+            return;
+          }catch(e){ /* on retombe sur prompt() */ }
+        }
+        prompt('Copiez ce lien pour le partager :', url);
       });
     });
   }
@@ -549,6 +575,24 @@
     wireStoreButtons(grid);
   }
 
+  // Ouvre la catégorie d'une pièce et fait défiler la collection jusqu'à elle.
+  function scrollToProduct(productId){
+    const p = products.find(x=>x.id===productId);
+    if(!p) return;
+    openCategories[(p.cat && p.cat.trim()) || 'Autre'] = true;
+    document.getElementById('searchName').value = '';
+    document.getElementById('searchMin').value = '';
+    document.getElementById('searchMax').value = '';
+    renderStore();
+    requestAnimationFrame(()=>{
+      const el = document.getElementById('prod-'+productId);
+      if(!el) return;
+      el.scrollIntoView({behavior:'smooth', block:'center'});
+      el.classList.add('flash-highlight');
+      setTimeout(()=>el.classList.remove('flash-highlight'), 1600);
+    });
+  }
+
   /* ---------- SEARCH BAR WIRING ---------- */
   ['searchName','searchMin','searchMax'].forEach(id=>{
     const el = document.getElementById(id);
@@ -592,7 +636,7 @@
         ? `${effectivePrice(p.price).toLocaleString('fr-FR')} GNF<div class="cp-old-row"><span class="cp-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
         : `${Number(p.price).toLocaleString('fr-FR')} GNF`;
       return `
-      <div class="car-slide">
+      <div class="car-slide" data-pid="${p.id}" title="Voir dans la collection">
         <img src="${p.image}" alt="${escapeHtml(p.name)}" loading="lazy">
         <div class="car-caption">
           <div class="cn">${escapeHtml(p.name)}</div>
@@ -603,6 +647,9 @@
     dots.innerHTML = carouselItems.map((p,i)=>`<button class="car-dot ${i===0?'active':''}" data-i="${i}"></button>`).join('');
     dots.querySelectorAll('.car-dot').forEach(d=>{
       d.addEventListener('click', ()=> goToSlide(Number(d.dataset.i)));
+    });
+    track.querySelectorAll('.car-slide[data-pid]').forEach(slide=>{
+      slide.addEventListener('click', ()=> scrollToProduct(slide.dataset.pid));
     });
     if(carouselItems.length > 1){
       carouselTimer = setInterval(()=>{
