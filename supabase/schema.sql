@@ -222,6 +222,9 @@ begin
   if p_customer is null or length(trim(p_customer)) = 0 then
     raise exception 'Nom du client requis';
   end if;
+  if p_address is null or length(trim(p_address)) = 0 then
+    raise exception 'Adresse de livraison requise';
+  end if;
   if p_items is null or jsonb_array_length(p_items) = 0 then
     raise exception 'Le panier est vide';
   end if;
