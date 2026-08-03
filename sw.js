@@ -11,6 +11,9 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: payload.icon || '/logo.webp',
     badge: payload.icon || '/logo.webp',
+    vibrate: [300, 150, 300, 150, 300],
+    requireInteraction: true,
+    silent: false,
     data: { url: payload.url || '/' }
   };
   event.waitUntil(self.registration.showNotification(title, options));
