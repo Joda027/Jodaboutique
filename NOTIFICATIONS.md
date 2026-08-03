@@ -89,3 +89,90 @@ npx supabase functions deploy send-push
 - Sur iPhone, les notifications ne fonctionnent que si la cliente a ajouté le
   site à son écran d'accueil (limitation d'Apple, pas du site).
 - Les abonnements devenus invalides sont supprimés automatiquement à l'envoi.
+
+---
+
+# Alertes équipe — nouvelle commande / annulation
+
+Pour être prévenue vous-même (site + email) dès qu'une commande arrive ou est
+annulée, sans avoir à garder l'onglet ouvert.
+
+## 1. Ce qui marche déjà, sans rien configurer
+
+- Dans **Espace équipe**, l'onglet **Commandes** affiche un badge rouge avec
+  le nombre de commandes nouvelles, et le titre de l'onglet du navigateur
+  affiche `(N)` tant qu'il y a des commandes à traiter.
+- Si l'exécution SQL ci-dessous (`alter publication supabase_realtime add
+  table orders`) a fonctionné, ce badge se met à jour **instantanément**,
+  sans recharger la page, dès qu'une commande arrive ou est annulée pendant
+  que vous êtes sur le site.
+- Ceci est déjà inclus dans `supabase/schema.sql` : si vous avez ré-exécuté
+  tout le fichier, c'est fait. Sinon, exécutez juste :
+
+```sql
+create table if not exists team_push_subscribers (
+  id text primary key,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  team_member_id uuid references team_members(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table orders add column if not exists notified_new boolean not null default false;
+alter table orders add column if not exists notified_cancel boolean not null default false;
+alter table team_push_subscribers enable row level security;
+create policy "team can view own subscription" on team_push_subscribers for select using (team_member_id = current_team_id());
+create policy "team can insert own subscription" on team_push_subscribers for insert with check (team_member_id = current_team_id());
+create policy "team can update own subscription" on team_push_subscribers for update using (team_member_id = current_team_id()) with check (team_member_id = current_team_id());
+create policy "team can delete own subscription" on team_push_subscribers for delete using (team_member_id = current_team_id());
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'orders'
+  ) then
+    alter publication supabase_realtime add table orders;
+  end if;
+end $$;
+```
+
+## 2. Notifications push sur votre téléphone/ordinateur (recommandé)
+
+Réutilise les clés VAPID déjà configurées pour les clientes (voir plus haut).
+Depuis votre ordinateur, à la racine du projet :
+
+```bash
+npx supabase functions deploy notify-team
+```
+
+Puis, dans **Espace équipe**, chaque membre qui veut être alerté clique sur
+le bouton **🔔 Alertes commandes** en haut à droite (une fois par appareil).
+Vous recevrez alors une notification à chaque nouvelle commande et à chaque
+annulation, même onglet fermé — comme sur votre téléphone.
+
+## 3. Notification par email (facultatif)
+
+Nécessite un compte gratuit sur [resend.com](https://resend.com) (100
+emails/jour gratuits, largement suffisant).
+
+1. Créez un compte sur resend.com, récupérez une **clé API**.
+2. Depuis votre ordinateur :
+
+```bash
+npx supabase secrets set \
+  RESEND_API_KEY="votre_cle_resend" \
+  NOTIFY_EMAIL="dos.olawale@gmail.com"
+npx supabase functions deploy notify-team
+```
+
+Tant que `RESEND_API_KEY` n'est pas défini, l'envoi d'email est simplement
+ignoré — le push et le badge continuent de fonctionner normalement.
+
+## Remarque sur la sécurité
+
+`notify-team` n'exige pas d'être connectée (contrairement à `send-push`),
+car une cliente qui vient de commander n'a pas de session équipe. Elle ne
+peut cependant déclencher chaque alerte qu'une seule fois par commande
+(numéro de commande imprévisible + drapeau `notified_new`/`notified_cancel`
+en base) : rejouer l'appel ne renvoie rien de plus.

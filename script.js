@@ -31,6 +31,8 @@
   let settings = {};
   let categories = [];
   let deliveryZones = [];
+  let ordersRealtimeChannel = null;
+  const baseTitle = document.title;
   let salesArchive = {count:0, revenue:0, byProduct:{}};
   let sessionLikes = {};
   let openCategories = {};
@@ -209,7 +211,31 @@
       }
       renderLoggedArea();
       startInactivityTimer();
+      subscribeOrdersRealtime();
+      refreshTeamAlertsBtn();
     }
+  }
+
+  function subscribeOrdersRealtime(){
+    if(ordersRealtimeChannel) return;
+    ordersRealtimeChannel = sb.channel('orders-changes')
+      .on('postgres_changes', {event:'*', schema:'public', table:'orders'}, async ()=>{
+        if(!currentUser) return;
+        await loadOrders();
+        updateOrdersBadge();
+        if(document.getElementById('tab-commandes').style.display !== 'none') renderOrdersTab();
+        if(currentUser.role==='admin') renderOverview();
+      })
+      .subscribe();
+  }
+
+  function updateOrdersBadge(){
+    if(!currentUser) return;
+    const isAdmin = currentUser.role==='admin';
+    const pending = orders.filter(o=> o.status==='nouvelle' && (isAdmin || o.claimedBy===null)).length;
+    const badge = document.getElementById('commandesBadge');
+    if(badge){ badge.textContent = String(pending); badge.style.display = pending>0 ? 'inline-flex' : 'none'; }
+    document.title = pending>0 ? `(${pending}) ${baseTitle}` : baseTitle;
   }
 
   /* ---------- TRAFFIC TRACKING ---------- */
@@ -326,6 +352,74 @@
     if(!sub) return;
     await sb.from('push_subscribers').delete().eq('endpoint', sub.endpoint);
     await sub.unsubscribe();
+  }
+
+  /* ---------- ALERTES ÉQUIPE (nouvelle commande / annulation) ---------- */
+  async function subscribeTeamPush(){
+    if(!pushSupported() || !currentUser) return false;
+    if(!swRegistration) await initPush();
+    if(!swRegistration) return false;
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted') return false;
+    let sub = await currentPushSubscription();
+    if(!sub){
+      sub = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    const j = sub.toJSON();
+    const row = {
+      id: 't'+Date.now()+Math.floor(Math.random()*1000),
+      endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+      team_member_id: currentUser.id
+    };
+    const { error } = await sb.from('team_push_subscribers').upsert(row, {onConflict:'endpoint'});
+    return !error;
+  }
+  async function unsubscribeTeamPush(){
+    const sub = await currentPushSubscription();
+    if(!sub || !currentUser) return;
+    // On ne coupe pas l'abonnement navigateur : il peut aussi servir au suivi client.
+    await sb.from('team_push_subscribers').delete().eq('endpoint', sub.endpoint).eq('team_member_id', currentUser.id);
+  }
+  async function isTeamPushSubscribed(){
+    if(!currentUser) return false;
+    const sub = await currentPushSubscription();
+    if(!sub) return false;
+    const { data } = await sb.from('team_push_subscribers').select('id').eq('endpoint', sub.endpoint).eq('team_member_id', currentUser.id).maybeSingle();
+    return !!data;
+  }
+  async function refreshTeamAlertsBtn(){
+    const btn = document.getElementById('teamAlertsBtn');
+    if(!btn) return;
+    if(!pushSupported()){ btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    const subscribed = await isTeamPushSubscribed();
+    btn.classList.toggle('is-subscribed', subscribed);
+    btn.textContent = subscribed ? '🔔 Alertes activées' : '🔔 Alertes commandes';
+  }
+  document.getElementById('teamAlertsBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('teamAlertsBtn');
+    const subscribed = await isTeamPushSubscribed();
+    if(subscribed){
+      await unsubscribeTeamPush();
+    } else {
+      btn.textContent = 'Activation…';
+      const ok = await subscribeTeamPush();
+      if(!ok) alert("Notifications refusées ou indisponibles. Autorisez les notifications dans votre navigateur, puis réessayez.");
+    }
+    await refreshTeamAlertsBtn();
+  });
+  // Alerte l'équipe (push + email si configuré) sans bloquer le flux principal.
+  async function notifyTeam(event, orderId){
+    try{
+      await fetch(`${SUPABASE_URL}/functions/v1/notify-team`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({event, orderId})
+      });
+    }catch(e){ /* alerte secondaire : on n'interrompt jamais la commande pour ça */ }
   }
   // Bouton du menu contact (délégué : le menu est reconstruit à chaque rendu).
   document.getElementById('contactBar').addEventListener('click', async (e)=>{
@@ -806,6 +900,7 @@
     cart = {};
     renderCart(); renderStore(); renderCarousel(); renderHeroShowcase();
     if(currentUser){ await loadOrders(); renderLoggedArea(); }
+    notifyTeam('new_order', data.id);
 
     // Abonnement au suivi de commande (si la cliente l'a accepté).
     const optIn = document.getElementById('notifyOptIn');
@@ -953,6 +1048,8 @@
     stopInactivityTimer();
     await sb.auth.signOut();
     currentUser = null;
+    if(ordersRealtimeChannel){ sb.removeChannel(ordersRealtimeChannel); ordersRealtimeChannel = null; }
+    document.title = baseTitle;
     setView('admin');
     if(auto){
       const msg = document.getElementById('loginMsg');
@@ -1005,7 +1102,7 @@
 
     const tabs = tabsForRole(currentUser.role);
     const tabsEl = document.getElementById('adminTabs');
-    tabsEl.innerHTML = tabs.map((t,i)=>`<button class="admin-tab ${i===0?'active':''}" data-tab="${t.key}">${t.label}</button>`).join('');
+    tabsEl.innerHTML = tabs.map((t,i)=>`<button class="admin-tab ${i===0?'active':''}" data-tab="${t.key}">${t.label}${t.key==='commandes' ? '<span class="tab-badge" id="commandesBadge" style="display:none;"></span>' : ''}</button>`).join('');
     ['overview','stats','finances','produits','commandes','equipe','monprofil','mystats','reglages'].forEach(k=>{
       document.getElementById('tab-'+k).style.display = (tabs[0].key===k) ? '' : 'none';
     });
@@ -1616,6 +1713,7 @@ Données des 7 derniers jours :
 
   let expandedOrderIds = new Set();
   function renderOrdersTab(){
+    updateOrdersBadge();
     const isAdmin = currentUser.role==='admin';
     let visible;
     if(isAdmin) visible = orders;
@@ -1707,6 +1805,7 @@ Données des 7 derniers jours :
             }
             await logActivity(currentUser.name, 'a annulé la commande de '+o.customer);
             await loadProducts();
+            notifyTeam('order_cancelled', o.id);
           }
         }
         await loadOrders();
