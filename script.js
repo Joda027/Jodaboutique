@@ -755,6 +755,7 @@
     const phone = document.getElementById('custPhone').value.trim();
     const address = document.getElementById('custAddress').value.trim();
     if(!name){ msg.textContent = "Merci d'indiquer votre nom."; return; }
+    if(!address){ msg.textContent = "Merci d'indiquer votre adresse de livraison."; return; }
     const items = ids.map(id=>({id, qty:cart[id]}));
 
     msg.textContent = 'Envoi en cours…';
