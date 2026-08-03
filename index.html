@@ -216,7 +216,7 @@
         <div class="panel">
           <h4 id="ordersTitle">Commandes</h4>
           <div class="table-scroll"><table class="admin-table">
-            <thead><tr><th>Date</th><th>Cliente</th><th>Adresse</th><th>Articles</th><th>Total</th><th>Statut</th><th>Prise en charge</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Cliente</th><th>Articles</th><th>Total</th><th>Statut</th><th>Prise en charge</th><th></th></tr></thead>
             <tbody id="ordersBody"></tbody>
           </table></div>
           <div class="status-msg" id="ordersEmpty" style="display:none;">Aucune commande pour l'instant.</div>
@@ -375,6 +375,9 @@
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Lien de la page Facebook (facultatif)</label>
           <p class="section-note" style="margin-bottom:12px;">Adresse complète, ex: https://facebook.com/jodaboutique — le menu "Nous contacter" ouvrira directement Messenger sur cette page (reçu dans votre Meta Business Suite).</p>
           <input class="text-input" id="setFacebook" placeholder="https://facebook.com/jodaboutique">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Numéro Orange Money (facultatif)</label>
+          <p class="section-note" style="margin-bottom:12px;">Affiché à la cliente juste après la validation de sa commande, pour qu'elle puisse effectuer le dépôt.</p>
+          <input class="text-input" id="setOrangeMoney" placeholder="620000000">
           <button class="btn-mini" id="saveContactBtn">Enregistrer</button>
           <div class="status-msg" id="contactMsg"></div>
         </div>
@@ -411,6 +414,18 @@
           <input class="text-input" id="setPromoEndsAt" type="datetime-local">
           <button class="btn-mini" id="savePromoBtn">Enregistrer</button>
           <div class="status-msg" id="promoMsg"></div>
+        </div>
+        <div class="panel" style="max-width:520px;">
+          <h4>Livraison</h4>
+          <p class="section-note" style="margin-bottom:12px;">Active une liste de zones de livraison avec leur prix, que la cliente pourra choisir au moment de commander. Ça dépend de chaque cliente : si elle ne choisit aucune zone, aucun frais n'est ajouté. Ces frais ne sont jamais comptés dans vos statistiques/finances — ils sont juste indicatifs pour la cliente.</p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="setDeliveryEnabled"> Proposer des zones de livraison à la commande
+          </label>
+          <label style="font-size:12px;color:var(--muted);display:block;margin:12px 0 6px;">Zones et prix (une par ligne)</label>
+          <p class="section-note" style="margin-bottom:12px;">Format : Nom de la zone : Prix en GNF. Le prix est facultatif — une ligne sans prix s'affiche juste à titre indicatif ("à convenir"). Exemple :<br>Kaloum : 20000<br>Ratoma : 30000<br>Dixinn</p>
+          <textarea class="text-input" id="setDeliveryZones" rows="5" placeholder="Kaloum : 20000&#10;Ratoma : 30000&#10;Dixinn"></textarea>
+          <button class="btn-mini" id="saveDeliveryBtn">Enregistrer</button>
+          <div class="status-msg" id="deliveryMsg"></div>
         </div>
         <div class="panel" style="max-width:520px;">
           <h4>Stockage des photos</h4>
@@ -469,12 +484,16 @@
   <div class="drawer-foot">
     <div id="checkoutForm" style="display:none;">
       <input class="text-input" id="custName" placeholder="Votre nom">
-      <input class="text-input" id="custPhone" placeholder="Téléphone">
+      <input class="text-input" id="custPhone" placeholder="Téléphone *" inputmode="numeric" required>
       <input class="text-input" id="custAddress" placeholder="Quartier / adresse de livraison *" required>
+      <select class="text-input" id="custDeliveryZone" style="display:none;">
+        <option value="">Zone de livraison</option>
+      </select>
       <label class="checkbox-row" style="margin-bottom:10px;">
         <input type="checkbox" id="notifyOptIn" checked> Me prévenir du suivi de ma commande et des promotions
       </label>
     </div>
+    <div class="total-row" id="deliveryFeeRow" style="display:none;"><span>Livraison</span><span id="deliveryFeeAmount"></span></div>
     <div class="total-row"><span>Total</span><span id="cartTotal" style="color:var(--navy);">0 GNF</span></div>
     <button class="btn-primary" style="width:100%;" id="checkoutBtn">Commander</button>
     <div class="status-msg" id="checkoutMsg"></div>
