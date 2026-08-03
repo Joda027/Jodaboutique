@@ -43,6 +43,7 @@ create table if not exists orders (
   ts bigint not null,
   customer text not null,
   phone text,
+  address text,
   items jsonb not null,
   total numeric not null,
   original_total numeric,
@@ -194,10 +195,12 @@ create trigger trg_prevent_role_escalation
 -- 4. FONCTIONS MÉTIER (RPC) — écritures publiques sécurisées
 -- ------------------------------------------------------------
 
+drop function if exists place_order(text, text, jsonb);
 create or replace function place_order(
   p_customer text,
   p_phone text,
-  p_items jsonb  -- [{"id": "...", "qty": 2}, ...]
+  p_items jsonb,  -- [{"id": "...", "qty": 2}, ...]
+  p_address text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -257,8 +260,8 @@ begin
     );
   end loop;
 
-  insert into orders (id, ts, customer, phone, items, total, status)
-  values (v_order_id, v_ts, trim(p_customer), p_phone, v_order_items, v_total, 'nouvelle');
+  insert into orders (id, ts, customer, phone, address, items, total, status)
+  values (v_order_id, v_ts, trim(p_customer), p_phone, nullif(trim(coalesce(p_address,'')),''), v_order_items, v_total, 'nouvelle');
 
   insert into activity_log (actor, action)
   values ('Cliente : ' || trim(p_customer), 'a passé une commande de ' || v_total || ' GNF');
@@ -266,7 +269,7 @@ begin
   return jsonb_build_object('id', v_order_id, 'ts', v_ts, 'total', v_total, 'items', v_order_items);
 end;
 $$;
-grant execute on function place_order(text, text, jsonb) to anon, authenticated;
+grant execute on function place_order(text, text, jsonb, text) to anon, authenticated;
 
 create or replace function like_product(p_product_id text)
 returns integer
@@ -377,6 +380,23 @@ create policy "team can view subscribers" on push_subscribers for select using (
 -- announcements (historique des envois, réservé à l'équipe)
 create policy "team can view announcements" on announcements for select using (is_team_member());
 create policy "admin can insert announcements" on announcements for insert with check (is_admin());
+
+-- ------------------------------------------------------------
+-- 5bis. STOCKAGE DES PHOTOS PRODUITS
+-- ------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('product-images', 'product-images', true)
+on conflict (id) do nothing;
+
+create policy "public can view product images" on storage.objects for select
+  using (bucket_id = 'product-images');
+create policy "team can upload product images" on storage.objects for insert
+  with check (bucket_id = 'product-images' and is_team_member());
+create policy "team can update product images" on storage.objects for update
+  using (bucket_id = 'product-images' and is_team_member());
+create policy "team can delete product images" on storage.objects for delete
+  using (bucket_id = 'product-images' and is_team_member());
 
 -- ------------------------------------------------------------
 -- 6. PREMIÈRE ADMINISTRATRICE

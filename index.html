@@ -216,7 +216,7 @@
         <div class="panel">
           <h4 id="ordersTitle">Commandes</h4>
           <div class="table-scroll"><table class="admin-table">
-            <thead><tr><th>Date</th><th>Cliente</th><th>Articles</th><th>Total</th><th>Statut</th><th>Prise en charge</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Cliente</th><th>Adresse</th><th>Articles</th><th>Total</th><th>Statut</th><th>Prise en charge</th><th></th></tr></thead>
             <tbody id="ordersBody"></tbody>
           </table></div>
           <div class="status-msg" id="ordersEmpty" style="display:none;">Aucune commande pour l'instant.</div>
@@ -255,6 +255,11 @@
         <div class="panel">
           <h4>Meilleures ventes (depuis le début)</h4>
           <div id="topSellers"></div>
+        </div>
+        <div class="panel">
+          <h4>Ventes par lieu de livraison</h4>
+          <p class="section-note" style="margin-bottom:12px;">Chiffre d'affaires selon l'adresse/quartier indiqué par les clientes à la commande.</p>
+          <div id="salesByLocation"></div>
         </div>
         <div class="panel">
           <h4>Ce que le public aime ❤</h4>
@@ -408,6 +413,12 @@
           <div class="status-msg" id="promoMsg"></div>
         </div>
         <div class="panel" style="max-width:520px;">
+          <h4>Stockage des photos</h4>
+          <p class="section-note" style="margin-bottom:12px;">Convertit les anciennes photos de produits (stockées directement dans la base) vers un stockage de fichiers plus rapide. Les nouvelles photos ajoutées depuis l'admin utilisent déjà ce stockage automatiquement. Cette opération est sans risque et peut être relancée si besoin.</p>
+          <button class="btn-mini" id="migrateImagesBtn">Convertir les anciennes photos</button>
+          <div class="status-msg" id="migrateImagesMsg"></div>
+        </div>
+        <div class="panel" style="max-width:520px;">
           <h4>Réinitialiser l'historique des ventes</h4>
           <p class="section-note" style="margin-bottom:12px;">Efface toutes les commandes passées (par exemple en fin d'année ou pour repartir à zéro), mais conserve un résumé statistique cumulé : nombre total de ventes, chiffre d'affaires total, et total vendu par article. Les produits, l'équipe et les dépenses ne sont pas touchés.</p>
           <div id="archiveSummary" class="report-box" style="display:block;margin-bottom:14px;"></div>
@@ -459,6 +470,7 @@
     <div id="checkoutForm" style="display:none;">
       <input class="text-input" id="custName" placeholder="Votre nom">
       <input class="text-input" id="custPhone" placeholder="Téléphone">
+      <input class="text-input" id="custAddress" placeholder="Quartier / adresse de livraison">
       <label class="checkbox-row" style="margin-bottom:10px;">
         <input type="checkbox" id="notifyOptIn" checked> Me prévenir du suivi de ma commande et des promotions
       </label>
