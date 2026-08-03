@@ -414,12 +414,17 @@
   // Alerte l'équipe (push + email si configuré) sans bloquer le flux principal.
   async function notifyTeam(event, orderId){
     try{
-      await fetch(`${SUPABASE_URL}/functions/v1/notify-team`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/notify-team`, {
         method:'POST',
-        headers:{ 'Content-Type':'application/json' },
+        headers:{
+          'Content-Type':'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        },
         body: JSON.stringify({event, orderId})
       });
-    }catch(e){ /* alerte secondaire : on n'interrompt jamais la commande pour ça */ }
+      if(!res.ok) console.error('notifyTeam', res.status, await res.text());
+    }catch(e){ console.error('notifyTeam', e); /* alerte secondaire : on n'interrompt jamais la commande pour ça */ }
   }
   // Bouton du menu contact (délégué : le menu est reconstruit à chaque rendu).
   document.getElementById('contactBar').addEventListener('click', async (e)=>{
