@@ -1215,6 +1215,7 @@
   }
 
   function renderStatsTab(){
+    renderWeekPanel();
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && o.status!=='annulée');
@@ -1277,6 +1278,7 @@
   }
 
   function renderMyStatsTab(){
+    renderMyWeekPanel();
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const mk = monthKey(now);
@@ -1366,6 +1368,112 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     const totalExp = monthExpenses.reduce((s,e)=>s+Number(e.amount),0);
     return {mk, monthOrders, onsiteRevenue, monthOffline, offlineTotal, revenue, monthExpenses, totalExp, profit: revenue-totalExp};
   }
+
+  /* ---------- SEMAINE CALENDAIRE (LUNDI -> DIMANCHE) ---------- */
+  function weekBounds(ts){
+    const d = new Date(ts);
+    const day = (d.getDay()+6)%7; // lundi=0 ... dimanche=6
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate()-day, 0,0,0,0);
+    const sunday = new Date(monday.getTime() + 7*86400000 - 1);
+    return {start: monday.getTime(), end: sunday.getTime()};
+  }
+  function weekRangeLabel(ts){
+    const {start,end} = weekBounds(ts);
+    const opts = {day:'numeric', month:'short'};
+    return new Date(start).toLocaleDateString('fr-FR',opts)+' – '+new Date(end).toLocaleDateString('fr-FR',opts);
+  }
+  function weekFinancials(refTs){
+    const {start,end} = weekBounds(refTs);
+    const weekOrders = orders.filter(o=> o.ts>=start && o.ts<=end && o.status!=='annulée');
+    const onsiteRevenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0);
+    const weekOffline = offlineSales.filter(o=> o.ts>=start && o.ts<=end);
+    const offlineTotal = weekOffline.reduce((s,o)=>s+Number(o.amount||0),0);
+    const revenue = onsiteRevenue + offlineTotal;
+    const weekExpenses = expenses.filter(e=> e.ts>=start && e.ts<=end);
+    const totalExp = weekExpenses.reduce((s,e)=>s+Number(e.amount),0);
+    const itemsSold = weekOrders.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
+    return {start, end, weekOrders, onsiteRevenue, offlineTotal, revenue, totalExp, itemsSold, profit: revenue-totalExp};
+  }
+
+  let statsWeekOffset = 0;
+  function renderWeekPanel(){
+    const grid = document.getElementById('weekStatGrid');
+    if(!grid) return;
+    const now = Date.now();
+    const refTs = now + statsWeekOffset*7*86400000;
+    const f = weekFinancials(refTs);
+    document.getElementById('weekRangeLabel').textContent = weekRangeLabel(refTs);
+    document.getElementById('weekNextBtn').disabled = statsWeekOffset >= 0;
+
+    grid.innerHTML = `
+      <div class="stat-card"><div class="num">${f.weekOrders.length}</div><div class="lbl">Commandes</div></div>
+      <div class="stat-card"><div class="num">${f.itemsSold}</div><div class="lbl">Articles vendus</div></div>
+      <div class="stat-card"><div class="num">${f.revenue.toLocaleString('fr-FR')}</div><div class="lbl">Ventes (GNF)</div></div>
+      <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses (GNF)</div></div>
+      <div class="stat-card"><div class="num" style="color:${f.profit>=0?'var(--navy)':'var(--wine)'}">${f.profit.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net (GNF)</div></div>
+    `;
+
+    const soldMap = {};
+    f.weekOrders.forEach(o=> o.items.forEach(it=>{ soldMap[it.name] = (soldMap[it.name]||0) + it.qty; }));
+    barChart(document.getElementById('weekTopProducts'),
+      Object.entries(soldMap).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
+
+    const rows = [];
+    for(let i=7;i>=0;i--){ rows.push(weekFinancials(now - i*7*86400000)); }
+    document.getElementById('weekHistoryBody').innerHTML = rows.map(r=>`
+      <tr>
+        <td>${weekRangeLabel(r.start)}</td>
+        <td>${r.weekOrders.length}</td>
+        <td>${r.itemsSold}</td>
+        <td>${money(r.revenue)}</td>
+        <td>${money(r.totalExp)}</td>
+        <td style="color:${r.profit>=0?'var(--navy)':'var(--wine)'}">${money(r.profit)}</td>
+      </tr>`).join('');
+  }
+  document.getElementById('weekPrevBtn').addEventListener('click', ()=>{ statsWeekOffset--; renderWeekPanel(); });
+  document.getElementById('weekNextBtn').addEventListener('click', ()=>{ if(statsWeekOffset<0){ statsWeekOffset++; renderWeekPanel(); } });
+
+  let myWeekOffset = 0;
+  function renderMyWeekPanel(){
+    const grid = document.getElementById('myWeekStatGrid');
+    if(!grid || !currentUser) return;
+    const now = Date.now();
+    const refTs = now + myWeekOffset*7*86400000;
+    const {start,end} = weekBounds(refTs);
+    const mine = assistantOrders(currentUser.id, o=> o.ts>=start && o.ts<=end && o.status!=='annulée');
+    const treated = mine.filter(o=>o.status==='traitée');
+    const sales = treated.reduce((s,o)=>s+o.total,0);
+    const com = commissionOf(mine);
+    const itemsSold = mine.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
+
+    document.getElementById('myWeekRangeLabel').textContent = weekRangeLabel(refTs);
+    document.getElementById('myWeekNextBtn').disabled = myWeekOffset >= 0;
+
+    grid.innerHTML = `
+      <div class="stat-card"><div class="num">${mine.length}</div><div class="lbl">Commandes prises</div></div>
+      <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
+      <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
+      <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
+    `;
+
+    const soldMap = {};
+    mine.forEach(o=> o.items.forEach(it=>{ soldMap[it.name] = (soldMap[it.name]||0) + it.qty; }));
+    barChart(document.getElementById('myWeekTopProducts'),
+      Object.entries(soldMap).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
+
+    const rows = [];
+    for(let i=7;i>=0;i--){
+      const wTs = now - i*7*86400000;
+      const {start:ws, end:we} = weekBounds(wTs);
+      const wMine = assistantOrders(currentUser.id, o=> o.ts>=ws && o.ts<=we && o.status!=='annulée');
+      const wTreated = wMine.filter(o=>o.status==='traitée');
+      rows.push({label: weekRangeLabel(wTs), count: wMine.length, sales: wTreated.reduce((s,o)=>s+o.total,0), com: commissionOf(wMine)});
+    }
+    document.getElementById('myWeekHistoryBody').innerHTML = rows.map(r=>`
+      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td></tr>`).join('');
+  }
+  document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
+  document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
 
   function renderFinancesTab(){
     const f = monthFinancials(Date.now());
