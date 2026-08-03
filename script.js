@@ -165,6 +165,9 @@
     renderCarousel(); renderHeroShowcase();
     renderPromoCountdown();
 
+    const sharedProductId = new URLSearchParams(location.search).get('p');
+    if(sharedProductId) scrollToProduct(sharedProductId);
+
     const { data:{ session } } = await sb.auth.getSession();
     if(session) await handleAuthSession();
   }
@@ -443,6 +446,7 @@
       : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
     return `<div class="tag-card" id="prod-${p.id}" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
       <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
+      <button class="share-btn" data-share="${p.id}" title="Partager cette pièce">🔗</button>
       ${media}
       <h3>${escapeHtml(p.name)}</h3>
       <div class="cat">${escapeHtml(p.cat)}</div>
@@ -465,6 +469,28 @@
         if(!error) likes[id] = data;
         trackClick();
         renderStore();
+      });
+    });
+    root.querySelectorAll('button[data-share]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.share;
+        const p = products.find(x=>x.id===id);
+        const url = `${location.origin}/produit/${encodeURIComponent(id)}`;
+        const shareData = { title: p ? p.name+' — Joda Boutique' : 'Joda Boutique', url };
+        if(navigator.share){
+          try{ await navigator.share(shareData); }catch(e){ /* partage annulé */ }
+          return;
+        }
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          try{
+            await navigator.clipboard.writeText(url);
+            const original = btn.textContent;
+            btn.textContent = '✓';
+            setTimeout(()=>{ btn.textContent = original; }, 1500);
+            return;
+          }catch(e){ /* on retombe sur prompt() */ }
+        }
+        prompt('Copiez ce lien pour le partager :', url);
       });
     });
   }

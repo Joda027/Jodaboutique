@@ -1,0 +1,10 @@
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/produit/*"
+  to = "/.netlify/functions/product/:splat"
+  status = 200

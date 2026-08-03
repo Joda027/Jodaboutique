@@ -322,6 +322,12 @@
   }
   .like-btn.liked{ background:var(--wine); color:#fff; border-color:var(--wine); }
   .like-count{ font-family:'JetBrains Mono', monospace; font-size:10px; margin-left:2px; }
+  .share-btn{
+    position:absolute; top:10px; left:10px; background:var(--bg-panel); border:1px solid var(--line);
+    border-radius:50%; width:32px; height:32px; font-size:13px; display:flex; align-items:center; justify-content:center;
+    color:var(--navy); z-index:2;
+  }
+  .share-btn:hover{ border-color:var(--navy); }
 
   /* ---------- STATS ---------- */
   .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px;}
