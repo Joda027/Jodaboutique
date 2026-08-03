@@ -51,6 +51,8 @@ create table if not exists orders (
   original_total numeric,
   status text not null default 'nouvelle' check (status in ('nouvelle','en cours','traitée','annulée')),
   claimed_by uuid references team_members(id) on delete set null,
+  notified_new boolean not null default false,
+  notified_cancel boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -131,6 +133,16 @@ create table if not exists announcements (
   body text not null,
   sent_by uuid references team_members(id) on delete set null,
   recipients integer not null default 0
+);
+
+-- Abonnements push de l'équipe (alerte nouvelle commande / commande annulée)
+create table if not exists team_push_subscribers (
+  id text primary key,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  team_member_id uuid references team_members(id) on delete cascade,
+  created_at timestamptz not null default now()
 );
 
 -- ------------------------------------------------------------
@@ -359,6 +371,7 @@ alter table settings enable row level security;
 alter table sales_archive enable row level security;
 alter table push_subscribers enable row level security;
 alter table announcements enable row level security;
+alter table team_push_subscribers enable row level security;
 
 -- team_members
 create policy "team can view team" on team_members for select using (is_team_member());
@@ -417,6 +430,13 @@ create policy "team can view subscribers" on push_subscribers for select using (
 create policy "team can view announcements" on announcements for select using (is_team_member());
 create policy "admin can insert announcements" on announcements for insert with check (is_admin());
 
+-- team_push_subscribers : chaque membre gère son propre abonnement (alerte nouvelle
+-- commande / commande annulée sur son appareil).
+create policy "team can view own subscription" on team_push_subscribers for select using (team_member_id = current_team_id());
+create policy "team can insert own subscription" on team_push_subscribers for insert with check (team_member_id = current_team_id());
+create policy "team can update own subscription" on team_push_subscribers for update using (team_member_id = current_team_id()) with check (team_member_id = current_team_id());
+create policy "team can delete own subscription" on team_push_subscribers for delete using (team_member_id = current_team_id());
+
 -- ------------------------------------------------------------
 -- 5bis. STOCKAGE DES PHOTOS PRODUITS
 -- ------------------------------------------------------------
@@ -433,6 +453,22 @@ create policy "team can update product images" on storage.objects for update
   using (bucket_id = 'product-images' and is_team_member());
 create policy "team can delete product images" on storage.objects for delete
   using (bucket_id = 'product-images' and is_team_member());
+
+-- ------------------------------------------------------------
+-- 5ter. TEMPS RÉEL — la table orders diffuse ses changements pour que le badge
+-- "commandes en attente" de l'équipe se mette à jour instantanément, sans
+-- recharger la page.
+-- ------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'orders'
+  ) then
+    alter publication supabase_realtime add table orders;
+  end if;
+end $$;
 
 -- ------------------------------------------------------------
 -- 6. PREMIÈRE ADMINISTRATRICE
