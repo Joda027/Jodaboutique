@@ -389,6 +389,8 @@
   .wa-btn svg{ width:18px; height:18px; fill:currentColor; }
   .contact-bar{ display:flex; align-items:center; }
   .checkout-wa{ margin-top:10px; }
+  .checkout-contact-list{ display:flex; flex-direction:column; gap:2px; }
+  .checkout-contact-list .contact-menu-item{ padding:8px 4px; }
 
   /* ---------- MENU CONTACT (dans l'en-tête) ---------- */
   .contact-menu{ position:relative; }

@@ -53,7 +53,7 @@
   async function loadOrders(){
     if(!currentUser){ orders = []; return; }
     const { data, error } = await sb.from('orders')
-      .select('id,ts,customer,phone,items,total,originalTotal:original_total,status,claimedBy:claimed_by')
+      .select('id,ts,customer,phone,address,items,total,originalTotal:original_total,status,claimedBy:claimed_by')
       .order('ts', {ascending:false});
     if(error) console.error('loadOrders', error);
     orders = data || [];
@@ -321,13 +321,10 @@
     const match = String(fbUrl||'').match(/facebook\.com\/(?:pages\/[^\/]+\/)?([^\/\?&]+)/i);
     return match && match[1] ? `https://m.me/${match[1]}` : fbUrl;
   }
-  function renderContactBar(){
-    const bar = document.getElementById('contactBar');
+  function buildContactItems(includeBell){
     const num = waNumber();
     const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
     const fbUrl = (settings.facebook||'').trim();
-    if(!num && !phoneNum && !fbUrl){ bar.style.display='none'; return; }
-    bar.style.display='flex';
     let items = '';
     if(num){
       items += `<a class="contact-menu-item wa" href="${waLink('Bonjour Joda Boutique, je vous contacte depuis votre site.')}" target="_blank" rel="noopener">
@@ -342,10 +339,20 @@
       items += `<a class="contact-menu-item fb" href="${escapeHtml(messengerLink)}" target="_blank" rel="noopener">
         <span class="mi-icon">${FB_ICON}</span><span class="mi-text">Messenger</span></a>`;
     }
-    if(pushSupported()){
+    if(includeBell && pushSupported()){
       items += `<button type="button" class="contact-menu-item bell" id="subscribeBtn">
         <span class="mi-icon">${BELL_ICON}</span><span class="mi-text" id="subscribeLabel">Recevoir les nouveautés</span></button>`;
     }
+    return items;
+  }
+  function renderContactBar(){
+    const bar = document.getElementById('contactBar');
+    const num = waNumber();
+    const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
+    const fbUrl = (settings.facebook||'').trim();
+    if(!num && !phoneNum && !fbUrl){ bar.style.display='none'; return; }
+    bar.style.display='flex';
+    const items = buildContactItems(true);
     bar.innerHTML = `
       <div class="contact-menu">
         <button type="button" class="contact-menu-btn" id="contactMenuBtn">Nous contacter ▾</button>
@@ -365,7 +372,7 @@
   });
 
   /* ---------- IMAGE HELPER ---------- */
-  function resizeImageFile(file, maxDim, quality){
+  function resizeImageToBlob(file, maxDim, quality){
     return new Promise((resolve, reject)=>{
       const reader = new FileReader();
       reader.onerror = ()=>reject(new Error('read failed'));
@@ -379,12 +386,39 @@
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('encode failed')), 'image/jpeg', quality);
         };
         img.src = reader.result;
       };
       reader.readAsDataURL(file);
     });
+  }
+  // Redimensionne puis envoie la photo dans le stockage Supabase ; renvoie l'URL publique.
+  async function uploadProductPhoto(file, productId){
+    const blob = await resizeImageToBlob(file, 700, 0.72);
+    const path = `${productId}-${Date.now()}.jpg`;
+    const { error } = await sb.storage.from('product-images').upload(path, blob, {contentType:'image/jpeg', upsert:true});
+    if(error) throw error;
+    const { data } = sb.storage.from('product-images').getPublicUrl(path);
+    return data.publicUrl;
+  }
+  // Convertit une ancienne photo base64 (stockée dans la base) en fichier dans le stockage.
+  async function migrateLegacyImagesToStorage(){
+    const legacy = products.filter(p=>p.image && p.image.startsWith('data:'));
+    let done = 0;
+    for(const p of legacy){
+      try{
+        const blob = await (await fetch(p.image)).blob();
+        const path = `${p.id}-${Date.now()}.jpg`;
+        const { error: upErr } = await sb.storage.from('product-images').upload(path, blob, {contentType:'image/jpeg', upsert:true});
+        if(upErr) throw upErr;
+        const { data } = sb.storage.from('product-images').getPublicUrl(path);
+        const { error: updErr } = await sb.from('products').update({image:data.publicUrl}).eq('id', p.id);
+        if(updErr) throw updErr;
+        done++;
+      }catch(e){ console.error('migrateLegacyImagesToStorage', p.id, e); }
+    }
+    return {done, total:legacy.length};
   }
 
   function money(n){ return Number(n).toLocaleString('fr-FR') + ' GNF'; }
@@ -672,11 +706,12 @@
     if(ids.length===0){ msg.textContent = 'Ajoutez au moins un article.'; return; }
     const name = document.getElementById('custName').value.trim();
     const phone = document.getElementById('custPhone').value.trim();
+    const address = document.getElementById('custAddress').value.trim();
     if(!name){ msg.textContent = "Merci d'indiquer votre nom."; return; }
     const items = ids.map(id=>({id, qty:cart[id]}));
 
     msg.textContent = 'Envoi en cours…';
-    const { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items});
+    const { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address});
     if(error){
       msg.textContent = "La commande n'a pas pu être enregistrée (stock insuffisant ou erreur de connexion). Réessayez.";
       return;
@@ -697,12 +732,14 @@
     const recap = 'Bonjour Joda Boutique !%0AJe viens de passer une commande :%0A'
       + orderItems.map(it=>`- ${it.name} x${it.qty}`).join('%0A')
       + `%0ATotal : ${money(total)}`
-      + `%0ANom : ${name}` + (phone ? `%0ATéléphone : ${phone}` : '');
+      + `%0ANom : ${name}` + (phone ? `%0ATéléphone : ${phone}` : '') + (address ? `%0AAdresse : ${address}` : '');
     const waHref = waLink(decodeURIComponent(recap));
+    const contactItems = buildContactItems(false);
     msg.innerHTML = 'Commande envoyée ! Merci ' + escapeHtml(name) + '.'
-      + (waHref ? `<div class="checkout-wa"><a class="wa-btn" href="${waHref}" target="_blank" rel="noopener">${WA_ICON} Confirmer sur WhatsApp</a></div>` : '');
-    document.getElementById('custName').value=''; document.getElementById('custPhone').value='';
-    setTimeout(()=>{ if(!waHref){ msg.textContent=''; closeDrawer(); } }, 4000);
+      + (waHref ? `<div class="checkout-wa"><a class="wa-btn" href="${waHref}" target="_blank" rel="noopener">${WA_ICON} Confirmer sur WhatsApp</a></div>` : '')
+      + (contactItems ? `<p class="section-note" style="margin:12px 0 4px;">Vous pouvez aussi nous joindre directement :</p><div class="checkout-contact-list">${contactItems}</div>` : '');
+    document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value='';
+    setTimeout(()=>{ if(!waHref && !contactItems){ msg.textContent=''; closeDrawer(); } }, 4000);
   });
 
   /* ---------- NAV / VIEWS ---------- */
@@ -956,6 +993,17 @@
     });
     return map;
   }
+  function locationStats(){
+    const map = {};
+    orders.forEach(o=>{
+      if(o.status==='annulée') return;
+      const loc = (o.address && o.address.trim()) || 'Non précisé';
+      if(!map[loc]) map[loc] = {count:0, revenue:0};
+      map[loc].count++;
+      map[loc].revenue += Number(o.total||0);
+    });
+    return map;
+  }
   function barChart(container, entries, unit, wine){
     if(entries.length===0){ container.innerHTML = '<div class="status-msg">Pas encore de données.</div>'; return; }
     const max = Math.max(...entries.map(e=>e.value), 1);
@@ -997,6 +1045,10 @@
     Object.entries(salesArchive.byProduct||{}).forEach(([n,q])=>{ combined[n] = (combined[n]||0) + q; });
     barChart(document.getElementById('topSellers'),
       Object.entries(combined).map(([label,value])=>({label, value})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
+
+    const locMap = locationStats();
+    barChart(document.getElementById('salesByLocation'),
+      Object.entries(locMap).map(([label,v])=>({label, value:v.revenue})).sort((a,b)=>b.value-a.value).slice(0,10), ' GNF');
 
     const likeEntries = Object.entries(likes).map(([pid,count])=>{
       const p = products.find(x=>x.id===pid);
@@ -1412,7 +1464,7 @@ Données des 7 derniers jours :
             const file = input.files[0];
             if(!file) return;
             try{
-              const image = await resizeImageFile(file, 700, 0.72);
+              const image = await uploadProductPhoto(file, p.id);
               await sb.from('products').update({image}).eq('id', p.id);
               await logActivity(currentUser.name, 'a ajouté une photo pour "'+p.name+'"');
               await loadProducts();
@@ -1437,13 +1489,14 @@ Données des 7 derniers jours :
     const msg = document.getElementById('addProductMsg');
     if(!name || !price){ msg.textContent = 'Renseignez au moins un nom et un prix.'; return; }
     const isAdminAdd = currentUser.role==='admin';
+    const newId = 'p'+Date.now();
     let image = '';
     if(photoInput.files && photoInput.files[0]){
-      try{ image = await resizeImageFile(photoInput.files[0], 700, 0.72); }
+      try{ image = await uploadProductPhoto(photoInput.files[0], newId); }
       catch(e){ /* pas grave, on continue sans photo */ }
     }
     const { error } = await sb.from('products').insert({
-      id:'p'+Date.now(), name, cat, price, stock, image,
+      id:newId, name, cat, price, stock, image,
       added_by: currentUser.id, approved: isAdminAdd
     });
     if(error){ msg.textContent = 'Erreur : '+error.message; return; }
@@ -1492,6 +1545,7 @@ Données des 7 derniers jours :
       return `<tr>
         <td>${new Date(o.ts).toLocaleString('fr-FR')}</td>
         <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}</td>
+        <td>${o.address ? escapeHtml(o.address) : '—'}</td>
         <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}</td>
         <td>${totalCell}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
@@ -1747,6 +1801,20 @@ Données des 7 derniers jours :
     msg.textContent = 'Promotion mise à jour.';
     renderStore(); renderCarousel(); renderHeroShowcase(); renderCart(); renderPromoCountdown();
     setTimeout(()=>msg.textContent='',2000);
+  });
+
+  document.getElementById('migrateImagesBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('migrateImagesBtn');
+    const msg = document.getElementById('migrateImagesMsg');
+    const legacyCount = products.filter(p=>p.image && p.image.startsWith('data:')).length;
+    if(!legacyCount){ msg.textContent = 'Aucune ancienne photo à convertir.'; return; }
+    btn.disabled = true;
+    msg.textContent = `Conversion de ${legacyCount} photo(s) en cours…`;
+    const { done, total } = await migrateLegacyImagesToStorage();
+    await loadProducts();
+    renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
+    btn.disabled = false;
+    msg.textContent = done===total ? `${done} photo(s) converties avec succès.` : `${done} sur ${total} converties — réessayez pour les autres (vérifiez votre connexion).`;
   });
 
   document.getElementById('resetSalesBtn').addEventListener('click', async ()=>{
