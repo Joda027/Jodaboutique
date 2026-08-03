@@ -30,6 +30,7 @@
   let offlineSales = [];
   let settings = {};
   let categories = [];
+  let deliveryZones = [];
   let salesArchive = {count:0, revenue:0, byProduct:{}};
   let sessionLikes = {};
   let openCategories = {};
@@ -53,7 +54,7 @@
   async function loadOrders(){
     if(!currentUser){ orders = []; return; }
     const { data, error } = await sb.from('orders')
-      .select('id,ts,customer,phone,address,items,total,originalTotal:original_total,status,claimedBy:claimed_by')
+      .select('id,ts,customer,phone,address,deliveryZone:delivery_zone,deliveryFee:delivery_fee,items,total,originalTotal:original_total,status,claimedBy:claimed_by')
       .order('ts', {ascending:false});
     if(error) console.error('loadOrders', error);
     orders = data || [];
@@ -102,10 +103,32 @@
     offlineSales = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,promo_active,promo_percent,promo_ends_at,categories').eq('id', true).maybeSingle();
+    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
-    settings = data || {whatsapp:'', phone:'', facebook:'', promo_active:false, promo_percent:0, promo_ends_at:null, categories:[]};
+    settings = data || {whatsapp:'', phone:'', facebook:'', orange_money:'', promo_active:false, promo_percent:0, promo_ends_at:null, delivery_enabled:false, delivery_zones:[], categories:[]};
     categories = Array.isArray(settings.categories) ? settings.categories : [];
+    deliveryZones = Array.isArray(settings.delivery_zones) ? settings.delivery_zones : [];
+  }
+  function deliveryActive(){ return !!settings.delivery_enabled && deliveryZones.length > 0; }
+  function parseDeliveryZones(text){
+    return String(text||'').split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+      const idx = line.indexOf(':');
+      if(idx === -1) return {zone: line, price: null};
+      const zone = line.slice(0, idx).trim();
+      const priceRaw = line.slice(idx+1).replace(/[^0-9]/g,'');
+      return {zone, price: priceRaw ? Number(priceRaw) : null};
+    }).filter(z=>z.zone);
+  }
+  function formatDeliveryZones(zones){
+    return (zones||[]).map(z=> z.price ? `${z.zone} : ${z.price}` : z.zone).join('\n');
+  }
+  function renderDeliveryZoneOptions(){
+    const sel = document.getElementById('custDeliveryZone');
+    if(!sel) return;
+    if(!deliveryActive()){ sel.style.display = 'none'; sel.value=''; return; }
+    sel.style.display = '';
+    sel.innerHTML = '<option value="">Zone de livraison (facultatif)</option>'
+      + deliveryZones.map(z=>`<option value="${escapeHtml(z.zone)}">${escapeHtml(z.zone)}${z.price ? ' — '+money(z.price) : ' (à convenir)'}</option>`).join('');
   }
   function promoActive(){
     if(!settings.promo_active || Number(settings.promo_percent) <= 0) return false;
@@ -164,6 +187,7 @@
     renderStore();
     renderCarousel(); renderHeroShowcase();
     renderPromoCountdown();
+    renderDeliveryZoneOptions();
 
     const sharedProductId = new URLSearchParams(location.search).get('p');
     if(sharedProductId) scrollToProduct(sharedProductId);
@@ -732,12 +756,24 @@
         });
       });
     }
-    const total = ids.reduce((s,id)=>{
+    const merchandiseTotal = ids.reduce((s,id)=>{
       const p = products.find(x=>x.id===id);
       return s + (p ? effectivePrice(p.price) * cart[id] : 0);
     },0);
-    document.getElementById('cartTotal').textContent = money(total);
+    const zoneSel = document.getElementById('custDeliveryZone');
+    const zoneName = zoneSel ? zoneSel.value : '';
+    const zone = zoneName ? deliveryZones.find(z=>z.zone===zoneName) : null;
+    const deliveryFee = (zone && zone.price) ? Number(zone.price) : 0;
+    const feeRow = document.getElementById('deliveryFeeRow');
+    if(zone && zone.price){
+      feeRow.style.display = '';
+      document.getElementById('deliveryFeeAmount').textContent = money(deliveryFee);
+    } else {
+      feeRow.style.display = 'none';
+    }
+    document.getElementById('cartTotal').textContent = money(merchandiseTotal + deliveryFee);
   }
+  document.getElementById('custDeliveryZone').addEventListener('change', renderCart);
 
   function openDrawer(){ document.getElementById('drawer').classList.add('open'); document.getElementById('overlay').classList.add('show'); }
   function closeDrawer(){ document.getElementById('drawer').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
@@ -752,14 +788,16 @@
     const msg = document.getElementById('checkoutMsg');
     if(ids.length===0){ msg.textContent = 'Ajoutez au moins un article.'; return; }
     const name = document.getElementById('custName').value.trim();
-    const phone = document.getElementById('custPhone').value.trim();
+    const phone = document.getElementById('custPhone').value.replace(/[^0-9]/g,'');
     const address = document.getElementById('custAddress').value.trim();
+    const deliveryZone = document.getElementById('custDeliveryZone').value || null;
     if(!name){ msg.textContent = "Merci d'indiquer votre nom."; return; }
+    if(!phone){ msg.textContent = "Merci d'indiquer votre numéro de téléphone (chiffres uniquement)."; return; }
     if(!address){ msg.textContent = "Merci d'indiquer votre adresse de livraison."; return; }
     const items = ids.map(id=>({id, qty:cart[id]}));
 
     msg.textContent = 'Envoi en cours…';
-    const { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address});
+    const { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address, p_delivery_zone:deliveryZone});
     if(error){
       msg.textContent = "La commande n'a pas pu être enregistrée (stock insuffisant ou erreur de connexion). Réessayez.";
       return;
@@ -777,17 +815,28 @@
 
     const orderItems = data.items || [];
     const total = data.total || 0;
+    const deliveryFee = data.deliveryFee || 0;
+    const grandTotal = total + deliveryFee;
     const recap = 'Bonjour Joda Boutique !%0AJe viens de passer une commande :%0A'
       + orderItems.map(it=>`- ${it.name} x${it.qty}`).join('%0A')
-      + `%0ATotal : ${money(total)}`
+      + `%0ATotal articles : ${money(total)}`
+      + (deliveryZone ? `%0ALivraison (${deliveryZone})${deliveryFee ? ' : '+money(deliveryFee) : ' : à convenir'}` : '')
+      + `%0ATotal à payer : ${money(grandTotal)}`
       + `%0ANom : ${name}` + (phone ? `%0ATéléphone : ${phone}` : '') + (address ? `%0AAdresse : ${address}` : '');
     const waHref = waLink(decodeURIComponent(recap));
     const contactItems = buildContactItems(false);
-    msg.innerHTML = 'Commande envoyée ! Merci ' + escapeHtml(name) + '.'
+    const orangeMoney = (settings.orange_money||'').trim();
+    msg.innerHTML = 'Commande envoyée ! Merci ' + escapeHtml(name) + '. Total à payer : ' + money(grandTotal) + '.'
+      + (orangeMoney ? `<div class="checkout-om"><span class="om-label">Dépôt Orange Money</span><span class="om-number">${escapeHtml(orangeMoney)}</span><button type="button" class="btn-mini" id="copyOmBtn">Copier</button></div>` : '')
       + (waHref ? `<div class="checkout-wa"><a class="wa-btn" href="${waHref}" target="_blank" rel="noopener">${WA_ICON} Confirmer sur WhatsApp</a></div>` : '')
       + (contactItems ? `<p class="section-note" style="margin:12px 0 4px;">Vous pouvez aussi nous joindre directement :</p><div class="checkout-contact-list">${contactItems}</div>` : '');
-    document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value='';
-    setTimeout(()=>{ if(!waHref && !contactItems){ msg.textContent=''; closeDrawer(); } }, 4000);
+    const copyOmBtn = document.getElementById('copyOmBtn');
+    if(copyOmBtn) copyOmBtn.addEventListener('click', async ()=>{
+      try{ await navigator.clipboard.writeText(orangeMoney); copyOmBtn.textContent = 'Copié ✓'; }
+      catch(e){ prompt('Copiez ce numéro :', orangeMoney); }
+    });
+    document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value=''; document.getElementById('custDeliveryZone').value='';
+    setTimeout(()=>{ if(!waHref && !contactItems && !orangeMoney){ msg.textContent=''; closeDrawer(); } }, 4000);
   });
 
   /* ---------- NAV / VIEWS ---------- */
@@ -1565,6 +1614,7 @@ Données des 7 derniers jours :
     renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase(); if(currentUser.role==='admin') renderOverview();
   });
 
+  let expandedOrderIds = new Set();
   function renderOrdersTab(){
     const isAdmin = currentUser.role==='admin';
     let visible;
@@ -1574,7 +1624,7 @@ Données des 7 derniers jours :
     document.getElementById('ordersEmpty').style.display = visible.length ? 'none' : 'block';
     oBody.innerHTML = visible.map(o=>{
       const pillClass = o.status==='nouvelle' ? 'new' : (o.status==='en cours' ? 'progress' : (o.status==='annulée' ? 'cancel' : 'done'));
-      let actionBtns = '';
+      let actionBtns = `<button class="btn-mini" data-detail="${o.id}">Détails</button>`;
       if(o.status==='nouvelle' && (isAdmin || o.claimedBy===null)){
         actionBtns += `<button class="btn-mini" data-act="claim" data-id="${o.id}">Prendre en charge</button>`;
       }
@@ -1590,17 +1640,39 @@ Données des 7 derniers jours :
       const totalCell = (o.originalTotal && o.originalTotal!==o.total)
         ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
         : money(o.total);
+      const open = expandedOrderIds.has(o.id);
+      const deliveryLine = o.deliveryZone
+        ? `${escapeHtml(o.deliveryZone)}${o.deliveryFee ? ' — '+money(o.deliveryFee)+' (non compté dans les statistiques)' : ' (prix à convenir)'}`
+        : 'Aucune';
       return `<tr>
         <td>${new Date(o.ts).toLocaleString('fr-FR')}</td>
         <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}</td>
-        <td>${o.address ? escapeHtml(o.address) : '—'}</td>
         <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}</td>
         <td>${totalCell}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
         <td>${o.claimedBy ? escapeHtml(teamName(o.claimedBy)) : '—'}</td>
         <td>${actionBtns}</td>
+      </tr>
+      <tr class="order-detail-row" id="detail-${o.id}" style="${open?'':'display:none;'}">
+        <td colspan="7">
+          <div class="order-detail-grid">
+            <div><strong>Téléphone :</strong> ${o.phone ? escapeHtml(o.phone) : '—'}</div>
+            <div><strong>Adresse :</strong> ${o.address ? escapeHtml(o.address) : '—'}</div>
+            <div><strong>Livraison :</strong> ${deliveryLine}</div>
+          </div>
+        </td>
       </tr>`;
     }).join('');
+    oBody.querySelectorAll('button[data-detail]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.detail;
+        const row = document.getElementById('detail-'+id);
+        if(!row) return;
+        const willOpen = row.style.display === 'none';
+        row.style.display = willOpen ? '' : 'none';
+        if(willOpen) expandedOrderIds.add(id); else expandedOrderIds.delete(id);
+      });
+    });
     oBody.querySelectorAll('button[data-act]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const o = orders.find(x=>x.id===btn.dataset.id);
@@ -1806,9 +1878,12 @@ Données des 7 derniers jours :
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';
+    document.getElementById('setOrangeMoney').value = settings.orange_money || '';
     document.getElementById('setPromoActive').checked = !!settings.promo_active;
     document.getElementById('setPromoPercent').value = settings.promo_percent || '';
     document.getElementById('setPromoEndsAt').value = settings.promo_ends_at ? toLocalDatetimeInput(settings.promo_ends_at) : '';
+    document.getElementById('setDeliveryEnabled').checked = !!settings.delivery_enabled;
+    document.getElementById('setDeliveryZones').value = formatDeliveryZones(deliveryZones);
     renderCategoriesUI();
     renderNotificationsPanel();
     const a = salesArchive || {count:0, revenue:0, byProduct:{}};
@@ -1825,8 +1900,9 @@ Données des 7 derniers jours :
     const wa = document.getElementById('setWhatsapp').value.replace(/[^0-9]/g,'');
     const ph = document.getElementById('setPhone').value.replace(/[^0-9]/g,'');
     const fb = document.getElementById('setFacebook').value.trim();
+    const om = document.getElementById('setOrangeMoney').value.replace(/[^0-9]/g,'');
     const msg = document.getElementById('contactMsg');
-    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb}).eq('id', true);
+    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb, orange_money: om}).eq('id', true);
     if(error){ msg.textContent = 'Erreur : '+error.message; return; }
     await loadSettings();
     msg.textContent = 'Coordonnées enregistrées.';
@@ -1848,6 +1924,19 @@ Données des 7 derniers jours :
     await logActivity(currentUser.name, active ? `a activé une promotion de ${percent}%` : 'a désactivé la promotion');
     msg.textContent = 'Promotion mise à jour.';
     renderStore(); renderCarousel(); renderHeroShowcase(); renderCart(); renderPromoCountdown();
+    setTimeout(()=>msg.textContent='',2000);
+  });
+
+  document.getElementById('saveDeliveryBtn').addEventListener('click', async ()=>{
+    const enabled = document.getElementById('setDeliveryEnabled').checked;
+    const zones = parseDeliveryZones(document.getElementById('setDeliveryZones').value);
+    const msg = document.getElementById('deliveryMsg');
+    const { error } = await sb.from('settings').update({delivery_enabled: enabled, delivery_zones: zones}).eq('id', true);
+    if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+    await loadSettings();
+    await logActivity(currentUser.name, enabled ? 'a activé les zones de livraison' : 'a désactivé les zones de livraison');
+    msg.textContent = 'Livraison mise à jour.';
+    renderDeliveryZoneOptions(); renderCart();
     setTimeout(()=>msg.textContent='',2000);
   });
 

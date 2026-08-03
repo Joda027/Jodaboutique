@@ -44,6 +44,8 @@ create table if not exists orders (
   customer text not null,
   phone text,
   address text,
+  delivery_zone text,
+  delivery_fee numeric default 0,
   items jsonb not null,
   total numeric not null,
   original_total numeric,
@@ -92,9 +94,12 @@ create table if not exists settings (
   whatsapp text default '',
   phone text default '',
   facebook text default '',
+  orange_money text default '',
   promo_active boolean default false,
   promo_percent numeric default 0,
   promo_ends_at timestamptz,
+  delivery_enabled boolean default false,
+  delivery_zones jsonb default '[]'::jsonb,
   categories jsonb default '[]'::jsonb
 );
 insert into settings (id, whatsapp) values (true, '') on conflict (id) do nothing;
@@ -196,11 +201,13 @@ create trigger trg_prevent_role_escalation
 -- ------------------------------------------------------------
 
 drop function if exists place_order(text, text, jsonb);
+drop function if exists place_order(text, text, jsonb, text);
 create or replace function place_order(
   p_customer text,
   p_phone text,
   p_items jsonb,  -- [{"id": "...", "qty": 2}, ...]
-  p_address text default null
+  p_address text default null,
+  p_delivery_zone text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -218,9 +225,19 @@ declare
   v_promo_active boolean := false;
   v_promo_percent numeric := 0;
   v_promo_ends_at timestamptz;
+  v_delivery_enabled boolean := false;
+  v_delivery_zones jsonb := '[]'::jsonb;
+  v_delivery_fee numeric := 0;
+  v_zone jsonb;
 begin
   if p_customer is null or length(trim(p_customer)) = 0 then
     raise exception 'Nom du client requis';
+  end if;
+  if p_phone is null or length(trim(p_phone)) = 0 then
+    raise exception 'Numéro de téléphone requis';
+  end if;
+  if trim(p_phone) !~ '^[0-9]+$' then
+    raise exception 'Numéro de téléphone invalide (chiffres uniquement)';
   end if;
   if p_address is null or length(trim(p_address)) = 0 then
     raise exception 'Adresse de livraison requise';
@@ -229,12 +246,25 @@ begin
     raise exception 'Le panier est vide';
   end if;
 
-  select coalesce(promo_active,false), coalesce(promo_percent,0), promo_ends_at
-    into v_promo_active, v_promo_percent, v_promo_ends_at
+  select coalesce(promo_active,false), coalesce(promo_percent,0), promo_ends_at,
+         coalesce(delivery_enabled,false), coalesce(delivery_zones,'[]'::jsonb)
+    into v_promo_active, v_promo_percent, v_promo_ends_at,
+         v_delivery_enabled, v_delivery_zones
     from settings where id = true;
 
   if v_promo_ends_at is not null and v_promo_ends_at <= now() then
     v_promo_active := false;
+  end if;
+
+  if v_delivery_enabled and p_delivery_zone is not null and length(trim(p_delivery_zone)) > 0 then
+    for v_zone in select * from jsonb_array_elements(v_delivery_zones) loop
+      if v_zone->>'zone' = p_delivery_zone then
+        v_delivery_fee := coalesce((v_zone->>'price')::numeric, 0);
+        exit;
+      end if;
+    end loop;
+  else
+    p_delivery_zone := null;
   end if;
 
   for v_item in select * from jsonb_array_elements(p_items) loop
@@ -263,16 +293,19 @@ begin
     );
   end loop;
 
-  insert into orders (id, ts, customer, phone, address, items, total, status)
-  values (v_order_id, v_ts, trim(p_customer), p_phone, nullif(trim(coalesce(p_address,'')),''), v_order_items, v_total, 'nouvelle');
+  -- v_total reste le montant des articles uniquement : les frais de livraison
+  -- sont conservés à part (delivery_fee) et n'entrent pas dans les statistiques.
+
+  insert into orders (id, ts, customer, phone, address, delivery_zone, delivery_fee, items, total, status)
+  values (v_order_id, v_ts, trim(p_customer), trim(p_phone), trim(p_address), p_delivery_zone, v_delivery_fee, v_order_items, v_total, 'nouvelle');
 
   insert into activity_log (actor, action)
   values ('Cliente : ' || trim(p_customer), 'a passé une commande de ' || v_total || ' GNF');
 
-  return jsonb_build_object('id', v_order_id, 'ts', v_ts, 'total', v_total, 'items', v_order_items);
+  return jsonb_build_object('id', v_order_id, 'ts', v_ts, 'total', v_total, 'items', v_order_items, 'deliveryZone', p_delivery_zone, 'deliveryFee', v_delivery_fee);
 end;
 $$;
-grant execute on function place_order(text, text, jsonb, text) to anon, authenticated;
+grant execute on function place_order(text, text, jsonb, text, text) to anon, authenticated;
 
 create or replace function like_product(p_product_id text)
 returns integer
