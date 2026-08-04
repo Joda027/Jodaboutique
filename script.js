@@ -1426,6 +1426,8 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
 
     const rows = [];
     for(let i=7;i>=0;i--){ rows.push(weekFinancials(now - i*7*86400000)); }
+    barChart(document.getElementById('weekSalesChart'),
+      rows.map(r=>({label: weekRangeLabel(r.start), value: r.revenue})), ' GNF');
     document.getElementById('weekHistoryBody').innerHTML = rows.map(r=>`
       <tr>
         <td>${weekRangeLabel(r.start)}</td>
@@ -1462,7 +1464,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
       <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
-      <div class="stat-card"><div class="num" style="color:${netAfterCom>=0?'var(--navy)':'var(--wine)'}">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
+      <div class="stat-card"><div class="num" style="color:var(--navy)">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
     `;
 
     const soldMap = {};
@@ -1480,8 +1482,10 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       const wCom = commissionOf(wMine);
       rows.push({label: weekRangeLabel(wTs), count: wMine.length, sales: wSales, com: wCom, net: wSales-wCom});
     }
+    barChart(document.getElementById('myWeekSalesChart'),
+      rows.map(r=>({label: r.label, value: r.sales})), ' GNF');
     document.getElementById('myWeekHistoryBody').innerHTML = rows.map(r=>`
-      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td style="color:${r.net>=0?'var(--navy)':'var(--wine)'}">${money(r.net)}</td></tr>`).join('');
+      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td style="color:var(--navy)">${money(r.net)}</td></tr>`).join('');
   }
   document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
   document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
