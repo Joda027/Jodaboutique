@@ -18,11 +18,17 @@
   }
 
   let products = [];
+  let variants = [];
   let orders = [];
   let team = [];
   let pendingInvites = [];
   let activity = [];
   let cart = {};
+  let selectedVariant = {};
+  function parseCartKey(key){
+    const idx = key.indexOf('::');
+    return idx===-1 ? {productId:key, variantId:null} : {productId:key.slice(0,idx), variantId:key.slice(idx+2)};
+  }
   let currentUser = null;
   let likes = {};
   let traffic = {};
@@ -53,6 +59,14 @@
     if(error) console.error('loadProducts', error);
     products = data || [];
   }
+  async function loadVariants(){
+    const { data, error } = await sb.from('product_variants')
+      .select('id,productId:product_id,color,image,stock')
+      .order('created_at', {ascending:true});
+    if(error) console.error('loadVariants', error);
+    variants = data || [];
+  }
+  function variantsFor(productId){ return variants.filter(v=>v.productId===productId); }
   async function loadOrders(){
     if(!currentUser){ orders = []; return; }
     const { data, error } = await sb.from('orders')
@@ -180,7 +194,7 @@
   }
 
   async function loadAll(){
-    await Promise.all([loadProducts(), loadLikes(), loadSettings()]);
+    await Promise.all([loadProducts(), loadVariants(), loadLikes(), loadSettings()]);
     await trackVisit();
     await initPush();
     renderContactBar();
@@ -204,7 +218,7 @@
     const { data } = await sb.from('team_members').select('id,name,role').eq('auth_user_id', user.id).maybeSingle();
     currentUser = data || null;
     if(currentUser){
-      await loadProducts();
+      await Promise.all([loadProducts(), loadVariants()]);
       await Promise.all([loadTeam(), loadOrders()]);
       if(currentUser.role==='admin'){
         await Promise.all([loadActivity(), loadExpenses(), loadOfflineSales(), loadSettings(), loadSalesArchive(), loadInvites(), loadTraffic()]);
@@ -556,10 +570,18 @@
   /* ---------- STORE RENDER ---------- */
   function isApproved(p){ return p.approved === true; }
   function productCardHtml(p, i){
-    const outOfStock = Number(p.stock) <= 0;
-    const low = Number(p.stock) > 0 && Number(p.stock) <= 3;
-    const media = p.image
-      ? `<div class="photo-wrap"><img src="${p.image}" alt="${escapeHtml(p.name)}" loading="lazy"></div>`
+    const pVariants = variantsFor(p.id);
+    let activeVariant = null;
+    if(pVariants.length){
+      activeVariant = pVariants.find(v=>v.id===selectedVariant[p.id]) || pVariants.find(v=>Number(v.stock)>0) || pVariants[0];
+      selectedVariant[p.id] = activeVariant.id;
+    }
+    const stockNum = activeVariant ? Number(activeVariant.stock) : Number(p.stock);
+    const outOfStock = stockNum <= 0;
+    const low = stockNum > 0 && stockNum <= 3;
+    const displayImage = (activeVariant && activeVariant.image) || p.image;
+    const media = displayImage
+      ? `<div class="photo-wrap"><img src="${displayImage}" alt="${escapeHtml(p.name)}" loading="lazy"></div>`
       : `<div class="icon">${iconFor(p.cat)}</div>`;
     const likeCount = likes[p.id] || 0;
     const liked = sessionLikes[p.id] ? 'liked' : '';
@@ -567,21 +589,41 @@
       ? `<span class="price">${effectivePrice(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>
          <div class="price-old-row"><span class="price-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
       : `<span class="price">${Number(p.price).toLocaleString('fr-FR')}</span><span class="curr">GNF</span>`;
+    const swatches = pVariants.length ? `<div class="color-swatches">
+      ${pVariants.map(v=>`<button type="button" class="swatch ${v.id===activeVariant.id?'active':''} ${Number(v.stock)<=0?'oos':''}" data-swatch="${v.id}" data-swatch-product="${p.id}" title="${escapeHtml(v.color)}${Number(v.stock)<=0?' (épuisé)':''}">${escapeHtml(v.color)}</button>`).join('')}
+    </div>` : '';
     return `<div class="tag-card" id="prod-${p.id}" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
       <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
       <button class="share-btn" data-share="${p.id}" title="Partager cette pièce">🔗</button>
       ${media}
       <h3>${escapeHtml(p.name)}</h3>
       <div class="cat">${escapeHtml(p.cat)}</div>
+      ${swatches}
       <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
-      <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : p.stock + ' en stock'}</div>
-      <button class="add" data-id="${p.id}" ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
+      <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : stockNum + ' en stock'}</div>
+      <button class="add" data-id="${p.id}" ${activeVariant?`data-variant-id="${activeVariant.id}"`:''} ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
     </div>`;
+  }
+  function refreshProductCard(id){
+    const p = products.find(x=>x.id===id);
+    const el = document.getElementById('prod-'+id);
+    if(!p || !el) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = productCardHtml(p, 0);
+    const newEl = tmp.firstElementChild;
+    el.replaceWith(newEl);
+    wireStoreButtons(newEl);
   }
 
   function wireStoreButtons(root){
     root.querySelectorAll('button.add').forEach(btn=>{
-      btn.addEventListener('click', ()=>{ addToCart(btn.dataset.id); trackClick(); });
+      btn.addEventListener('click', ()=>{ addToCart(btn.dataset.id, btn.dataset.variantId || null); trackClick(); });
+    });
+    root.querySelectorAll('button[data-swatch]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        selectedVariant[btn.dataset.swatchProduct] = btn.dataset.swatch;
+        refreshProductCard(btn.dataset.swatchProduct);
+      });
     });
     root.querySelectorAll('.photo-wrap img').forEach(img=>{
       img.addEventListener('click', ()=> openLightbox(img.src, img.alt));
@@ -812,55 +854,63 @@
     }
   });
 
-  function addToCart(id){
+  function addToCart(id, variantId){
     const p = products.find(x=>x.id===id);
     if(!p) return;
-    const inCart = cart[id] || 0;
-    if(inCart >= Number(p.stock)) return;
-    cart[id] = inCart + 1;
+    const key = variantId ? `${id}::${variantId}` : id;
+    const limit = variantId ? Number((variants.find(v=>v.id===variantId)||{}).stock || 0) : Number(p.stock);
+    const inCart = cart[key] || 0;
+    if(inCart >= limit) return;
+    cart[key] = inCart + 1;
     renderCart();
     openDrawer();
   }
 
   function renderCart(){
-    const ids = Object.keys(cart).filter(id=>cart[id]>0);
-    const count = ids.reduce((s,id)=>s+cart[id],0);
+    const keys = Object.keys(cart).filter(k=>cart[k]>0);
+    const count = keys.reduce((s,k)=>s+cart[k],0);
     document.getElementById('cartCount').textContent = count;
     const itemsEl = document.getElementById('drawerItems');
     const checkoutForm = document.getElementById('checkoutForm');
-    if(ids.length===0){
+    if(keys.length===0){
       itemsEl.innerHTML = '<div class="empty-note">Votre panier est vide.</div>';
       checkoutForm.style.display='none';
     } else {
       checkoutForm.style.display='block';
-      itemsEl.innerHTML = ids.map(id=>{
-        const p = products.find(x=>x.id===id);
+      itemsEl.innerHTML = keys.map(key=>{
+        const {productId, variantId} = parseCartKey(key);
+        const p = products.find(x=>x.id===productId);
         if(!p) return '';
+        const v = variantId ? variants.find(x=>x.id===variantId) : null;
+        const label = v ? `${p.name} (${v.color})` : p.name;
         return `<div class="cart-item">
           <div>
-            <div class="ci-name">${escapeHtml(p.name)}</div>
-            <div class="ci-price">${money(effectivePrice(p.price))} × ${cart[id]}</div>
+            <div class="ci-name">${escapeHtml(label)}</div>
+            <div class="ci-price">${money(effectivePrice(p.price))} × ${cart[key]}</div>
           </div>
           <div class="qty-ctrl">
-            <button data-act="dec" data-id="${id}">−</button>
-            <span>${cart[id]}</span>
-            <button data-act="inc" data-id="${id}">+</button>
+            <button data-act="dec" data-key="${key}">−</button>
+            <span>${cart[key]}</span>
+            <button data-act="inc" data-key="${key}">+</button>
           </div>
         </div>`;
       }).join('');
       itemsEl.querySelectorAll('button[data-act]').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-          const id = btn.dataset.id;
-          const p = products.find(x=>x.id===id);
-          if(btn.dataset.act==='inc'){ if(cart[id] < Number(p.stock)) cart[id]++; }
-          else { cart[id]--; if(cart[id]<=0) delete cart[id]; }
+          const key = btn.dataset.key;
+          const {productId, variantId} = parseCartKey(key);
+          const p = products.find(x=>x.id===productId);
+          const limit = variantId ? Number((variants.find(x=>x.id===variantId)||{}).stock || 0) : Number(p.stock);
+          if(btn.dataset.act==='inc'){ if(cart[key] < limit) cart[key]++; }
+          else { cart[key]--; if(cart[key]<=0) delete cart[key]; }
           renderCart();
         });
       });
     }
-    const merchandiseTotal = ids.reduce((s,id)=>{
-      const p = products.find(x=>x.id===id);
-      return s + (p ? effectivePrice(p.price) * cart[id] : 0);
+    const merchandiseTotal = keys.reduce((s,key)=>{
+      const {productId} = parseCartKey(key);
+      const p = products.find(x=>x.id===productId);
+      return s + (p ? effectivePrice(p.price) * cart[key] : 0);
     },0);
     const zoneSel = document.getElementById('custDeliveryZone');
     const zoneName = zoneSel ? zoneSel.value : '';
@@ -900,9 +950,9 @@
   document.getElementById('heroShop').addEventListener('click', ()=>{ window.scrollTo({top: document.getElementById('productGrid').offsetTop - 100, behavior:'smooth'}); });
 
   document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
-    const ids = Object.keys(cart).filter(id=>cart[id]>0);
+    const keys = Object.keys(cart).filter(k=>cart[k]>0);
     const msg = document.getElementById('checkoutMsg');
-    if(ids.length===0){ msg.textContent = 'Ajoutez au moins un article.'; return; }
+    if(keys.length===0){ msg.textContent = 'Ajoutez au moins un article.'; return; }
     const name = document.getElementById('custName').value.trim();
     const phone = document.getElementById('custPhone').value.replace(/[^0-9]/g,'');
     const address = document.getElementById('custAddress').value.trim();
@@ -910,7 +960,10 @@
     if(!name){ msg.textContent = "Merci d'indiquer votre nom."; return; }
     if(!phone){ msg.textContent = "Merci d'indiquer votre numéro de téléphone (chiffres uniquement)."; return; }
     if(!address){ msg.textContent = "Merci d'indiquer votre adresse de livraison."; return; }
-    const items = ids.map(id=>({id, qty:cart[id]}));
+    const items = keys.map(key=>{
+      const {productId, variantId} = parseCartKey(key);
+      return variantId ? {id:productId, qty:cart[key], variantId} : {id:productId, qty:cart[key]};
+    });
 
     msg.textContent = 'Envoi en cours…';
     const { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address, p_delivery_zone:deliveryZone});
@@ -918,7 +971,7 @@
       msg.textContent = "La commande n'a pas pu être enregistrée (stock insuffisant ou erreur de connexion). Réessayez.";
       return;
     }
-    await loadProducts();
+    await Promise.all([loadProducts(), loadVariants()]);
     cart = {};
     renderCart(); renderStore(); renderCarousel(); renderHeroShowcase();
     if(currentUser){ await loadOrders(); renderLoggedArea(); }
@@ -935,7 +988,7 @@
     const deliveryFee = data.deliveryFee || 0;
     const grandTotal = total + deliveryFee;
     const recap = 'Bonjour Joda Boutique !%0AJe viens de passer une commande :%0A'
-      + orderItems.map(it=>`- ${it.name} x${it.qty}`).join('%0A')
+      + orderItems.map(it=>`- ${it.name}${it.color ? ' ('+it.color+')' : ''} x${it.qty}`).join('%0A')
       + `%0ATotal articles : ${money(total)}`
       + (deliveryZone ? `%0ALivraison (${deliveryZone})${deliveryFee ? ' : '+money(deliveryFee) : ' : à convenir'}` : '')
       + `%0ATotal à payer : ${money(grandTotal)}`
@@ -1706,6 +1759,7 @@ Données des 7 derniers jours :
     }
   });
 
+  let expandedVariantIds = new Set();
   function renderProductsTab(){
     const isAdmin = currentUser.role==='admin';
     let visible = isAdmin ? products : products.filter(p=>p.addedBy===currentUser.id);
@@ -1718,6 +1772,7 @@ Données des 7 derniers jours :
       else if(p.rejected) statusPill = '<span class="pill new">refusée</span>' +
         (p.rejectReason ? `<div class="section-note" style="margin-top:4px;max-width:160px;">Motif : ${escapeHtml(p.rejectReason)}</div>` : '');
       else statusPill = '<span class="pill progress">en attente</span>';
+      const myVariants = variantsFor(p.id);
       let actions = '';
       if(isAdmin && !isApproved(p)){
         actions += `<button class="btn-mini" data-act="approve" data-id="${p.id}">✓ Approuver</button>`;
@@ -1730,8 +1785,19 @@ Données des 7 derniers jours :
       if(isAdmin) actions += `<button class="btn-mini" data-act="edit" data-id="${p.id}">Modifier</button>`;
       actions += `<button class="btn-mini" data-act="editprice" data-id="${p.id}">Prix</button>
           <button class="btn-mini" data-act="photo" data-id="${p.id}">Photo</button>
-          <button class="btn-mini" data-act="restock" data-id="${p.id}">+ stock</button>
+          <button class="btn-mini" data-detail-variants="${p.id}">Couleurs${myVariants.length?' ('+myVariants.length+')':''}</button>
+          ${myVariants.length===0 ? `<button class="btn-mini" data-act="restock" data-id="${p.id}">+ stock</button>` : ''}
           <button class="btn-mini danger" data-act="delete" data-id="${p.id}">Retirer</button>`;
+      const openV = expandedVariantIds.has(p.id);
+      const variantRows = myVariants.map(v=>`
+        <div class="variant-row">
+          ${v.image ? `<img class="photo-thumb" src="${v.image}" alt="">` : '<span class="photo-thumb"></span>'}
+          <strong>${escapeHtml(v.color)}</strong>
+          <span class="section-note">${v.stock} en stock</span>
+          <button class="btn-mini" data-vact="photo" data-vid="${v.id}" data-pid="${p.id}">Photo</button>
+          <button class="btn-mini" data-vact="stock" data-vid="${v.id}" data-pid="${p.id}">Stock</button>
+          <button class="btn-mini danger" data-vact="delete" data-vid="${v.id}" data-pid="${p.id}">Supprimer</button>
+        </div>`).join('');
       return `
       <tr>
         <td>${p.image ? `<img class="photo-thumb" src="${p.image}" alt="">` : '—'}</td>
@@ -1742,8 +1808,96 @@ Données des 7 derniers jours :
         <td>${statusPill}</td>
         <td style="${isAdmin?'':'display:none;'}">${escapeHtml(teamName(p.addedBy))}</td>
         <td>${actions}</td>
+      </tr>
+      <tr class="variant-detail-row" id="variantDetail-${p.id}" style="${openV?'':'display:none;'}">
+        <td colspan="8">
+          <div class="variant-manage">
+            ${variantRows || '<div class="section-note" style="margin-bottom:10px;">Aucune couleur ajoutée — la pièce reste vendue sans choix de couleur tant qu\'aucune n\'est ajoutée ici.</div>'}
+            <div class="variant-add-form">
+              <input class="text-input" style="margin:0;" id="newColorName-${p.id}" placeholder="Nom de la couleur (ex: Or)">
+              <input class="text-input" style="margin:0;" id="newColorStock-${p.id}" type="number" min="0" placeholder="Stock">
+              <input class="text-input" style="margin:0;" id="newColorPhoto-${p.id}" type="file" accept="image/*">
+              <button class="btn-mini" data-vact="add" data-pid="${p.id}">Ajouter cette couleur</button>
+            </div>
+            <div class="status-msg" id="variantMsg-${p.id}"></div>
+          </div>
+        </td>
       </tr>`;
     }).join('') || `<tr><td colspan="${isAdmin?8:7}">Aucune pièce ${isAdmin?'enregistrée':'dans votre rayon'}.</td></tr>`;
+    body.querySelectorAll('button[data-detail-variants]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const pid = btn.dataset.detailVariants;
+        const row = document.getElementById('variantDetail-'+pid);
+        if(!row) return;
+        const willOpen = row.style.display === 'none';
+        row.style.display = willOpen ? '' : 'none';
+        if(willOpen) expandedVariantIds.add(pid); else expandedVariantIds.delete(pid);
+      });
+    });
+    body.querySelectorAll('button[data-vact]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pid = btn.dataset.pid;
+        const p = products.find(x=>x.id===pid);
+        if(currentUser.role!=='admin' && p.addedBy !== currentUser.id) return;
+        if(btn.dataset.vact === 'add'){
+          const nameInput = document.getElementById('newColorName-'+pid);
+          const stockInput = document.getElementById('newColorStock-'+pid);
+          const photoInput = document.getElementById('newColorPhoto-'+pid);
+          const msg = document.getElementById('variantMsg-'+pid);
+          const color = nameInput.value.trim();
+          const stock = Math.max(0, Number(stockInput.value) || 0);
+          if(!color){ msg.textContent = 'Indiquez un nom de couleur.'; return; }
+          const newId = 'v'+Date.now();
+          let image = '';
+          if(photoInput.files && photoInput.files[0]){
+            try{ image = await uploadProductPhoto(photoInput.files[0], newId); }
+            catch(e){ /* pas grave, couleur enregistrée sans photo */ }
+          }
+          const { error } = await sb.from('product_variants').insert({id:newId, product_id:pid, color, image, stock});
+          if(error){ msg.textContent = 'Erreur : '+error.message; return; }
+          await sb.from('products').update({stock: Number(p.stock) + stock}).eq('id', pid);
+          await logActivity(currentUser.name, 'a ajouté la couleur "'+color+'" pour "'+p.name+'"');
+          expandedVariantIds.add(pid);
+        } else if(btn.dataset.vact === 'stock'){
+          const v = variants.find(x=>x.id===btn.dataset.vid);
+          const add = prompt('Combien de pièces ajouter au stock de la couleur "'+v.color+'" ? (nombre négatif pour retirer)', '5');
+          if(add===null) return;
+          const newVStock = Math.max(0, Number(v.stock) + (Number(add)||0));
+          const appliedDelta = newVStock - Number(v.stock);
+          await sb.from('product_variants').update({stock:newVStock}).eq('id', v.id);
+          await sb.from('products').update({stock: Math.max(0, Number(p.stock) + appliedDelta)}).eq('id', pid);
+          await logActivity(currentUser.name, 'a ajusté le stock de la couleur "'+v.color+'" de "'+p.name+'"');
+          expandedVariantIds.add(pid);
+        } else if(btn.dataset.vact === 'photo'){
+          const v = variants.find(x=>x.id===btn.dataset.vid);
+          const input = document.createElement('input');
+          input.type = 'file'; input.accept = 'image/*';
+          input.onchange = async ()=>{
+            const file = input.files[0];
+            if(!file) return;
+            try{
+              const image = await uploadProductPhoto(file, v.id);
+              await sb.from('product_variants').update({image}).eq('id', v.id);
+              await logActivity(currentUser.name, 'a ajouté une photo pour la couleur "'+v.color+'"');
+              expandedVariantIds.add(pid);
+              await loadVariants();
+              renderProductsTab(); renderStore();
+            }catch(e){ alert("La photo n'a pas pu être chargée."); }
+          };
+          input.click();
+          return;
+        } else if(btn.dataset.vact === 'delete'){
+          const v = variants.find(x=>x.id===btn.dataset.vid);
+          if(!confirm('Supprimer la couleur "'+v.color+'" ('+v.stock+' en stock) ?')) return;
+          await sb.from('product_variants').delete().eq('id', v.id);
+          await sb.from('products').update({stock: Math.max(0, Number(p.stock) - Number(v.stock))}).eq('id', pid);
+          await logActivity(currentUser.name, 'a supprimé la couleur "'+v.color+'" de "'+p.name+'"');
+          expandedVariantIds.add(pid);
+        }
+        await Promise.all([loadProducts(), loadVariants()]);
+        renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
+      });
+    });
     body.querySelectorAll('button[data-act]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.id;
@@ -1895,7 +2049,7 @@ Données des 7 derniers jours :
       return `<tr>
         <td>${new Date(o.ts).toLocaleString('fr-FR')}</td>
         <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}</td>
-        <td>${o.items.map(it=>escapeHtml(it.name)+' ×'+it.qty).join(', ')}</td>
+        <td>${o.items.map(it=>escapeHtml(it.name)+(it.color?' ('+escapeHtml(it.color)+')':'')+' ×'+it.qty).join(', ')}</td>
         <td>${totalCell}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
         <td>${o.claimedBy ? escapeHtml(teamName(o.claimedBy)) : '—'}</td>
@@ -1952,6 +2106,10 @@ Données des 7 derniers jours :
             for(const it of o.items){
               const p = products.find(x=>x.id===it.id);
               if(p) await sb.from('products').update({stock: Number(p.stock) + Number(it.qty)}).eq('id', it.id);
+              if(it.variantId){
+                const { data: v } = await sb.from('product_variants').select('stock').eq('id', it.variantId).maybeSingle();
+                if(v) await sb.from('product_variants').update({stock: Number(v.stock) + Number(it.qty)}).eq('id', it.variantId);
+              }
             }
             await logActivity(currentUser.name, 'a annulé la commande de '+o.customer);
             await loadProducts();

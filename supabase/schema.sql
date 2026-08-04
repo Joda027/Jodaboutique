@@ -38,6 +38,20 @@ create table if not exists products (
   created_at timestamptz not null default now()
 );
 
+-- Déclinaisons de couleur d'une pièce (photo + stock propres à chaque couleur).
+-- products.stock reste le stock TOTAL, tenu à jour automatiquement à chaque
+-- ajout/retrait de couleur : tous les affichages/rapports existants
+-- (rupture, stock restant, etc.) continuent de fonctionner sans changement.
+create table if not exists product_variants (
+  id text primary key,
+  product_id text not null references products(id) on delete cascade,
+  color text not null,
+  image text,
+  stock integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists product_variants_product_id_idx on product_variants(product_id);
+
 create table if not exists orders (
   id text primary key,
   ts bigint not null,
@@ -217,7 +231,7 @@ drop function if exists place_order(text, text, jsonb, text);
 create or replace function place_order(
   p_customer text,
   p_phone text,
-  p_items jsonb,  -- [{"id": "...", "qty": 2}, ...]
+  p_items jsonb,  -- [{"id": "...", "qty": 2, "variantId": "..." (optionnel)}, ...]
   p_address text default null,
   p_delivery_zone text default null
 ) returns jsonb
@@ -228,6 +242,9 @@ as $$
 declare
   v_item jsonb;
   v_product products%rowtype;
+  v_variant product_variants%rowtype;
+  v_color text;
+  v_variant_id text;
   v_total numeric := 0;
   v_order_items jsonb := '[]'::jsonb;
   v_order_id text := 'o' || (floor(extract(epoch from now())*1000))::bigint::text || floor(random()*1000)::text;
@@ -284,14 +301,35 @@ begin
     if v_qty is null or v_qty <= 0 then
       raise exception 'Quantité invalide';
     end if;
+    v_variant_id := v_item->>'variantId';
+    v_color := null;
 
-    update products
-      set stock = stock - v_qty
-      where id = (v_item->>'id') and approved = true and stock >= v_qty
-      returning * into v_product;
+    if v_variant_id is not null then
+      update product_variants
+        set stock = stock - v_qty
+        where id = v_variant_id and product_id = (v_item->>'id') and stock >= v_qty
+        returning * into v_variant;
 
-    if not found then
-      raise exception 'Stock insuffisant pour un des articles';
+      if not found then
+        raise exception 'Stock insuffisant pour une des couleurs choisies';
+      end if;
+
+      select * into v_product from products where id = v_item->>'id' and approved = true;
+      if not found then
+        raise exception 'Article introuvable ou non approuvé';
+      end if;
+
+      update products set stock = stock - v_qty where id = v_product.id;
+      v_color := v_variant.color;
+    else
+      update products
+        set stock = stock - v_qty
+        where id = (v_item->>'id') and approved = true and stock >= v_qty
+        returning * into v_product;
+
+      if not found then
+        raise exception 'Stock insuffisant pour un des articles';
+      end if;
     end if;
 
     v_unit_price := v_product.price;
@@ -301,7 +339,8 @@ begin
 
     v_total := v_total + (v_unit_price * v_qty);
     v_order_items := v_order_items || jsonb_build_object(
-      'id', v_product.id, 'name', v_product.name, 'price', v_unit_price, 'qty', v_qty
+      'id', v_product.id, 'name', v_product.name, 'price', v_unit_price, 'qty', v_qty,
+      'color', v_color, 'variantId', v_variant_id
     );
   end loop;
 
@@ -372,6 +411,7 @@ alter table sales_archive enable row level security;
 alter table push_subscribers enable row level security;
 alter table announcements enable row level security;
 alter table team_push_subscribers enable row level security;
+alter table product_variants enable row level security;
 
 -- team_members
 create policy "team can view team" on team_members for select using (is_team_member());
@@ -387,6 +427,22 @@ create policy "public can view approved products" on products for select using (
 create policy "team can insert own products" on products for insert with check (is_team_member() AND added_by = current_team_id());
 create policy "team can update own or admin any" on products for update using (is_admin() OR added_by = current_team_id()) with check (is_admin() OR added_by = current_team_id());
 create policy "team can delete own or admin any" on products for delete using (is_admin() OR added_by = current_team_id());
+
+-- product_variants (couleurs) : mêmes droits que la pièce parente
+create policy "public can view variants of visible products" on product_variants for select using (
+  exists(select 1 from products p where p.id = product_variants.product_id and (p.approved = true or is_team_member()))
+);
+create policy "team can insert variants for own products" on product_variants for insert with check (
+  exists(select 1 from products p where p.id = product_variants.product_id and (is_admin() or p.added_by = current_team_id()))
+);
+create policy "team can update variants for own products" on product_variants for update using (
+  exists(select 1 from products p where p.id = product_variants.product_id and (is_admin() or p.added_by = current_team_id()))
+) with check (
+  exists(select 1 from products p where p.id = product_variants.product_id and (is_admin() or p.added_by = current_team_id()))
+);
+create policy "team can delete variants for own products" on product_variants for delete using (
+  exists(select 1 from products p where p.id = product_variants.product_id and (is_admin() or p.added_by = current_team_id()))
+);
 
 -- orders (l'insertion publique passe uniquement par place_order())
 create policy "team can select orders" on orders for select using (is_team_member());
