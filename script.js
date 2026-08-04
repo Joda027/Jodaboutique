@@ -798,10 +798,10 @@
       const pVariants = variantsFor(p.id);
       if(pVariants.length){
         pVariants.forEach(v=>{
-          const img = v.image || p.image;
-          if(img) items.push({id:p.id, variantId:v.id, name:p.name, price:p.price, color:v.color, image:img});
+          if(!v.image || Number(v.stock) <= 0) return;
+          items.push({id:p.id, variantId:v.id, name:p.name, price:p.price, color:v.color, image:v.image});
         });
-      } else if(p.image){
+      } else if(p.image && Number(p.stock) > 0){
         items.push({id:p.id, variantId:null, name:p.name, price:p.price, color:null, image:p.image});
       }
     });
