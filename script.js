@@ -583,6 +583,9 @@
     root.querySelectorAll('button.add').forEach(btn=>{
       btn.addEventListener('click', ()=>{ addToCart(btn.dataset.id); trackClick(); });
     });
+    root.querySelectorAll('.photo-wrap img').forEach(img=>{
+      img.addEventListener('click', ()=> openLightbox(img.src, img.alt));
+    });
     root.querySelectorAll('button[data-like]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.like;
@@ -876,6 +879,20 @@
 
   function openDrawer(){ document.getElementById('drawer').classList.add('open'); document.getElementById('overlay').classList.add('show'); }
   function closeDrawer(){ document.getElementById('drawer').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
+
+  function openLightbox(src, alt){
+    if(!src) return;
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightboxImg').alt = alt || '';
+    document.getElementById('imgLightbox').style.display = 'flex';
+  }
+  function closeLightbox(){
+    document.getElementById('imgLightbox').style.display = 'none';
+    document.getElementById('lightboxImg').src = '';
+  }
+  document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+  document.getElementById('imgLightbox').addEventListener('click', (e)=>{ if(e.target.id==='imgLightbox') closeLightbox(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeLightbox(); });
 
   document.getElementById('openCart').addEventListener('click', openDrawer);
   document.getElementById('closeCart').addEventListener('click', closeDrawer);
