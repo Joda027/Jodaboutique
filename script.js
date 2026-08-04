@@ -1464,7 +1464,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
       <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
-      <div class="stat-card"><div class="num" style="color:var(--navy)">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
+      <div class="stat-card net-highlight"><div class="num">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
     `;
 
     const soldMap = {};
@@ -1485,7 +1485,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     barChart(document.getElementById('myWeekSalesChart'),
       rows.map(r=>({label: r.label, value: r.sales})), ' GNF');
     document.getElementById('myWeekHistoryBody').innerHTML = rows.map(r=>`
-      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td style="color:var(--navy)">${money(r.net)}</td></tr>`).join('');
+      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td style="color:#1B7A3D;font-weight:600;">${money(r.net)}</td></tr>`).join('');
   }
   document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
   document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
