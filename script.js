@@ -1392,7 +1392,12 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     const weekExpenses = expenses.filter(e=> e.ts>=start && e.ts<=end);
     const totalExp = weekExpenses.reduce((s,e)=>s+Number(e.amount),0);
     const itemsSold = weekOrders.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
-    return {start, end, weekOrders, onsiteRevenue, offlineTotal, revenue, totalExp, itemsSold, profit: revenue-totalExp};
+    const totalCom = team.filter(t=>t.role==='assistant').reduce((sum,a)=>{
+      const mine = assistantOrders(a.id, o=> o.ts>=start && o.ts<=end && o.status!=='annulée');
+      return sum + commissionOf(mine);
+    }, 0);
+    const netProfit = revenue - totalExp - totalCom;
+    return {start, end, weekOrders, onsiteRevenue, offlineTotal, revenue, totalExp, itemsSold, totalCom, profit: netProfit};
   }
 
   let statsWeekOffset = 0;
@@ -1410,7 +1415,8 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${f.itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${f.revenue.toLocaleString('fr-FR')}</div><div class="lbl">Ventes (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses (GNF)</div></div>
-      <div class="stat-card"><div class="num" style="color:${f.profit>=0?'var(--navy)':'var(--wine)'}">${f.profit.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net (GNF)</div></div>
+      <div class="stat-card"><div class="num">${f.totalCom.toLocaleString('fr-FR')}</div><div class="lbl">Commissions équipe (GNF)</div></div>
+      <div class="stat-card"><div class="num" style="color:${f.profit>=0?'var(--navy)':'var(--wine)'}">${f.profit.toLocaleString('fr-FR')}</div><div class="lbl">Net après commissions (GNF)</div></div>
     `;
 
     const soldMap = {};
@@ -1427,6 +1433,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
         <td>${r.itemsSold}</td>
         <td>${money(r.revenue)}</td>
         <td>${money(r.totalExp)}</td>
+        <td>${money(r.totalCom)}</td>
         <td style="color:${r.profit>=0?'var(--navy)':'var(--wine)'}">${money(r.profit)}</td>
       </tr>`).join('');
   }
@@ -1449,11 +1456,13 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     document.getElementById('myWeekRangeLabel').textContent = weekRangeLabel(refTs);
     document.getElementById('myWeekNextBtn').disabled = myWeekOffset >= 0;
 
+    const netAfterCom = sales - com;
     grid.innerHTML = `
       <div class="stat-card"><div class="num">${mine.length}</div><div class="lbl">Commandes prises</div></div>
       <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
       <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
+      <div class="stat-card"><div class="num">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
     `;
 
     const soldMap = {};
@@ -1467,10 +1476,12 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       const {start:ws, end:we} = weekBounds(wTs);
       const wMine = assistantOrders(currentUser.id, o=> o.ts>=ws && o.ts<=we && o.status!=='annulée');
       const wTreated = wMine.filter(o=>o.status==='traitée');
-      rows.push({label: weekRangeLabel(wTs), count: wMine.length, sales: wTreated.reduce((s,o)=>s+o.total,0), com: commissionOf(wMine)});
+      const wSales = wTreated.reduce((s,o)=>s+o.total,0);
+      const wCom = commissionOf(wMine);
+      rows.push({label: weekRangeLabel(wTs), count: wMine.length, sales: wSales, com: wCom, net: wSales-wCom});
     }
     document.getElementById('myWeekHistoryBody').innerHTML = rows.map(r=>`
-      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td></tr>`).join('');
+      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td>${money(r.net)}</td></tr>`).join('');
   }
   document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
   document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
@@ -1483,7 +1494,8 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       const mine = assistantOrders(a.id, o=> o.ts && monthKey(o.ts)===mk);
       const treated = mine.filter(o=>o.status==='traitée');
       const sales = treated.reduce((s,o)=>s+o.total,0);
-      return {name:a.name, count:treated.length, sales, com: Math.round(sales*COMMISSION_RATE)};
+      const com = Math.round(sales*COMMISSION_RATE);
+      return {name:a.name, count:treated.length, sales, com, net: sales-com};
     });
     const totalCom = comRows.reduce((s,r)=>s+r.com,0);
     const netProfit = f.profit - totalCom;
@@ -1503,7 +1515,8 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
         <td>${r.count}</td>
         <td>${money(r.sales)}</td>
         <td><strong>${money(r.com)}</strong></td>
-      </tr>`).join('') || '<tr><td colspan="4">Aucune assistante.</td></tr>';
+        <td>${money(r.net)}</td>
+      </tr>`).join('') || '<tr><td colspan="5">Aucune assistante.</td></tr>';
 
     const body = document.getElementById('expensesBody');
     document.getElementById('expEmpty').style.display = f.monthExpenses.length ? 'none' : 'block';
