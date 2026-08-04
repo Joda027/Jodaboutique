@@ -1462,7 +1462,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
       <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
-      <div class="stat-card"><div class="num">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
+      <div class="stat-card"><div class="num" style="color:${netAfterCom>=0?'var(--navy)':'var(--wine)'}">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
     `;
 
     const soldMap = {};
@@ -1481,7 +1481,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       rows.push({label: weekRangeLabel(wTs), count: wMine.length, sales: wSales, com: wCom, net: wSales-wCom});
     }
     document.getElementById('myWeekHistoryBody').innerHTML = rows.map(r=>`
-      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td>${money(r.net)}</td></tr>`).join('');
+      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td style="color:${r.net>=0?'var(--navy)':'var(--wine)'}">${money(r.net)}</td></tr>`).join('');
   }
   document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
   document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
@@ -1515,7 +1515,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
         <td>${r.count}</td>
         <td>${money(r.sales)}</td>
         <td><strong>${money(r.com)}</strong></td>
-        <td>${money(r.net)}</td>
+        <td style="color:${r.net>=0?'var(--navy)':'var(--wine)'}">${money(r.net)}</td>
       </tr>`).join('') || '<tr><td colspan="5">Aucune assistante.</td></tr>';
 
     const body = document.getElementById('expensesBody');
