@@ -238,8 +238,10 @@
   .stat-card{ background:var(--bg-panel); border:1px solid var(--line); border-radius:6px; padding:18px 20px;}
   .stat-card .num{ font-family:'JetBrains Mono', monospace; font-size:26px; color:var(--navy); font-weight:600;}
   .stat-card .lbl{ font-size:12px; color:var(--muted); margin-top:4px;}
-  .stat-card.net-highlight{ background:#EAF6EE; border-color:rgba(27,122,61,0.25); }
-  .stat-card.net-highlight .num{ color:#1B7A3D; }
+  .stat-card.net-highlight{ background:#F7EAEC; border-color:rgba(124,59,68,0.3); }
+  .stat-card.net-highlight .num{ color:var(--wine); }
+  .stat-card.commission-highlight{ background:#EAF6EE; border-color:rgba(27,122,61,0.25); }
+  .stat-card.commission-highlight .num{ color:#1B7A3D; }
   .team-row{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .team-row input{ margin:0; }
   .activity-scroll{ max-height:300px; overflow-y:auto; border-top:1px solid var(--line); }

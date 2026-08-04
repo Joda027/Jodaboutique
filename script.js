@@ -1293,8 +1293,8 @@
     document.getElementById('myStatsGrid').innerHTML = `
       <div class="stat-card"><div class="num">${mineWeek.length}</div><div class="lbl">Commandes prises (7 jours)</div></div>
       <div class="stat-card"><div class="num">${weekSales.toLocaleString('fr-FR')}</div><div class="lbl">Mes ventes traitées 7 jours (GNF)</div></div>
-      <div class="stat-card"><div class="num">${weekCom.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission 7 jours (GNF)</div></div>
-      <div class="stat-card"><div class="num">${monthCom.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission du mois (GNF)</div></div>
+      <div class="stat-card commission-highlight"><div class="num">${weekCom.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission 7 jours (GNF)</div></div>
+      <div class="stat-card commission-highlight"><div class="num">${monthCom.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission du mois (GNF)</div></div>
       <div class="stat-card"><div class="num">${pending}</div><div class="lbl">En attente de traitement</div></div>
     `;
 
@@ -1416,7 +1416,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${f.revenue.toLocaleString('fr-FR')}</div><div class="lbl">Ventes (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.totalCom.toLocaleString('fr-FR')}</div><div class="lbl">Commissions équipe (GNF)</div></div>
-      <div class="stat-card"><div class="num" style="color:${f.profit>=0?'var(--navy)':'var(--wine)'}">${f.profit.toLocaleString('fr-FR')}</div><div class="lbl">Net après commissions (GNF)</div></div>
+      <div class="stat-card net-highlight"><div class="num">${f.profit.toLocaleString('fr-FR')}</div><div class="lbl">Net après commissions (GNF)</div></div>
     `;
 
     const soldMap = {};
@@ -1436,7 +1436,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
         <td>${money(r.revenue)}</td>
         <td>${money(r.totalExp)}</td>
         <td>${money(r.totalCom)}</td>
-        <td style="color:${r.profit>=0?'var(--navy)':'var(--wine)'}">${money(r.profit)}</td>
+        <td style="color:var(--wine);font-weight:600;">${money(r.profit)}</td>
       </tr>`).join('');
   }
   document.getElementById('weekPrevBtn').addEventListener('click', ()=>{ statsWeekOffset--; renderWeekPanel(); });
@@ -1463,7 +1463,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${mine.length}</div><div class="lbl">Commandes prises</div></div>
       <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
-      <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
+      <div class="stat-card commission-highlight"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
       <div class="stat-card net-highlight"><div class="num">${netAfterCom.toLocaleString('fr-FR')}</div><div class="lbl">Net boutique après ma commission (GNF)</div></div>
     `;
 
@@ -1485,7 +1485,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     barChart(document.getElementById('myWeekSalesChart'),
       rows.map(r=>({label: r.label, value: r.sales})), ' GNF');
     document.getElementById('myWeekHistoryBody').innerHTML = rows.map(r=>`
-      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td>${money(r.com)}</td><td style="color:#1B7A3D;font-weight:600;">${money(r.net)}</td></tr>`).join('');
+      <tr><td>${r.label}</td><td>${r.count}</td><td>${money(r.sales)}</td><td style="color:#1B7A3D;font-weight:600;">${money(r.com)}</td><td style="color:var(--wine);font-weight:600;">${money(r.net)}</td></tr>`).join('');
   }
   document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
   document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
@@ -1509,7 +1509,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${f.offlineTotal.toLocaleString('fr-FR')}</div><div class="lbl">dont ventes hors site (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses du mois (GNF)</div></div>
       <div class="stat-card"><div class="num">${totalCom.toLocaleString('fr-FR')}</div><div class="lbl">Commissions (10%)</div></div>
-      <div class="stat-card"><div class="num" style="color:${netProfit>=0?'var(--navy)':'var(--wine)'}">${netProfit.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net (GNF)</div></div>
+      <div class="stat-card net-highlight"><div class="num">${netProfit.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.monthOrders.length}</div><div class="lbl">Commandes du mois</div></div>
     `;
 
@@ -1519,7 +1519,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
         <td>${r.count}</td>
         <td>${money(r.sales)}</td>
         <td><strong>${money(r.com)}</strong></td>
-        <td style="color:${r.net>=0?'var(--navy)':'var(--wine)'}">${money(r.net)}</td>
+        <td style="color:var(--wine);font-weight:600;">${money(r.net)}</td>
       </tr>`).join('') || '<tr><td colspan="5">Aucune assistante.</td></tr>';
 
     const body = document.getElementById('expensesBody');
