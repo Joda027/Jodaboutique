@@ -744,9 +744,10 @@
   }
 
   // Ouvre la catégorie d'une pièce et fait défiler la collection jusqu'à elle.
-  function scrollToProduct(productId){
+  function scrollToProduct(productId, variantId){
     const p = products.find(x=>x.id===productId);
     if(!p) return;
+    if(variantId) selectedVariant[productId] = variantId;
     openCategories[(p.cat && p.cat.trim()) || 'Autre'] = true;
     document.getElementById('searchName').value = '';
     document.getElementById('searchMin').value = '';
@@ -791,33 +792,48 @@
   /* ---------- FEATURED CAROUSEL ---------- */
   let carouselTimer = null;
   let carouselItems = [];
+  function buildCarouselItems(){
+    const items = [];
+    products.filter(isApproved).forEach(p=>{
+      const pVariants = variantsFor(p.id);
+      if(pVariants.length){
+        pVariants.forEach(v=>{
+          const img = v.image || p.image;
+          if(img) items.push({id:p.id, variantId:v.id, name:p.name, price:p.price, color:v.color, image:img});
+        });
+      } else if(p.image){
+        items.push({id:p.id, variantId:null, name:p.name, price:p.price, color:null, image:p.image});
+      }
+    });
+    return items;
+  }
   function renderCarousel(){
     const section = document.getElementById('carouselSection');
     const track = document.getElementById('carouselTrack');
     const dots = document.getElementById('carouselDots');
-    carouselItems = products.filter(p=>p.image && isApproved(p));
+    carouselItems = buildCarouselItems();
     if(carouselTimer){ clearInterval(carouselTimer); carouselTimer = null; }
     if(carouselItems.length === 0){ section.style.display = 'none'; return; }
     section.style.display = '';
-    track.innerHTML = carouselItems.map(p=>{
+    track.innerHTML = carouselItems.map(item=>{
       const cp = promoActive()
-        ? `${effectivePrice(p.price).toLocaleString('fr-FR')} GNF<div class="cp-old-row"><span class="cp-old">${Number(p.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
-        : `${Number(p.price).toLocaleString('fr-FR')} GNF`;
+        ? `${effectivePrice(item.price).toLocaleString('fr-FR')} GNF<div class="cp-old-row"><span class="cp-old">${Number(item.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
+        : `${Number(item.price).toLocaleString('fr-FR')} GNF`;
       return `
-      <div class="car-slide" data-pid="${p.id}" title="Voir dans la collection">
-        <img src="${p.image}" alt="${escapeHtml(p.name)}" loading="lazy">
+      <div class="car-slide" data-pid="${item.id}" data-vid="${item.variantId||''}" title="Voir dans la collection">
+        <img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy">
         <div class="car-caption">
-          <div class="cn">${escapeHtml(p.name)}</div>
+          <div class="cn">${escapeHtml(item.name)}${item.color ? ' — '+escapeHtml(item.color) : ''}</div>
           <div class="cp">${cp}</div>
         </div>
       </div>`;
     }).join('');
-    dots.innerHTML = carouselItems.map((p,i)=>`<button class="car-dot ${i===0?'active':''}" data-i="${i}"></button>`).join('');
+    dots.innerHTML = carouselItems.map((item,i)=>`<button class="car-dot ${i===0?'active':''}" data-i="${i}"></button>`).join('');
     dots.querySelectorAll('.car-dot').forEach(d=>{
       d.addEventListener('click', ()=> goToSlide(Number(d.dataset.i)));
     });
     track.querySelectorAll('.car-slide[data-pid]').forEach(slide=>{
-      slide.addEventListener('click', ()=> scrollToProduct(slide.dataset.pid));
+      slide.addEventListener('click', ()=> scrollToProduct(slide.dataset.pid, slide.dataset.vid || null));
     });
     if(carouselItems.length > 1){
       carouselTimer = setInterval(()=>{
