@@ -467,6 +467,8 @@
           <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Numéro Orange Money (facultatif)</label>
           <p class="section-note" style="margin-bottom:12px;">Affiché à la cliente juste après la validation de sa commande, pour qu'elle puisse effectuer le dépôt.</p>
           <input class="text-input" id="setOrangeMoney" placeholder="620000000">
+          <label class="checkbox-row" style="margin-bottom:6px;"><input type="checkbox" id="setOnlinePayment"> Proposer le paiement en ligne Orange Money (débit validé sur le téléphone)</label>
+          <p class="section-note" style="margin-bottom:12px;">À activer seulement quand les clés de votre compte marchand Orange sont configurées sur Netlify : sinon la cliente verra une erreur.</p>
           <button class="btn-mini" id="saveContactBtn">Enregistrer</button>
           <div class="status-msg" id="contactMsg"></div>
         </div>
@@ -584,6 +586,35 @@
       <select class="text-input" id="custDeliveryZone" style="display:none;">
         <option value="">Zone de livraison</option>
       </select>
+      <div class="pay-block">
+        <div class="pay-title">Mode de paiement</div>
+        <div class="pay-options">
+          <button type="button" class="pay-opt" data-pay="orange_money" id="payOptOm" style="display:none;">
+            <span class="om-logo">Orange<br>Money</span><span>Transfert Orange Money</span>
+          </button>
+          <button type="button" class="pay-opt" data-pay="en_ligne" id="payOptOnline" style="display:none;">
+            <span class="om-logo">Orange<br>Money</span><span>Payer en ligne</span>
+          </button>
+          <button type="button" class="pay-opt active" data-pay="livraison">
+            <span class="cash-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5" stroke-linecap="round"/></svg></span><span>À la livraison</span>
+          </button>
+        </div>
+        <div id="omPanel" style="display:none;">
+          <div class="pay-info">
+            Envoyez le <strong>total à payer</strong> au numéro Orange Money de la boutique :
+            <div class="om-merchant"><span id="omMerchantNumber"></span><button type="button" class="btn-mini" id="copyOmMerchant">Copier</button></div>
+            Composez <strong>#144#</strong> (menu Orange Money), faites le transfert, puis notez la référence reçue par SMS.
+          </div>
+          <input class="text-input" id="omPayerPhone" placeholder="Votre numéro Orange Money *" inputmode="numeric">
+          <input class="text-input" id="omPayRef" placeholder="Référence de la transaction (reçue par SMS)">
+          <div class="pay-note">L'équipe vérifie votre paiement puis confirme votre commande.</div>
+        </div>
+        <div id="onlinePanel" class="pay-info" style="display:none;">
+          Après « Commander », vous êtes redirigée vers la <strong>page sécurisée Orange Money</strong>.
+          Validez le paiement sur votre téléphone : votre commande est confirmée automatiquement.
+        </div>
+        <div id="cashPanel" class="pay-info">Vous payez en espèces à la réception de votre commande.</div>
+      </div>
       <label class="checkbox-row" style="margin-bottom:10px;">
         <input type="checkbox" id="notifyOptIn" checked> Me prévenir du suivi de ma commande et des promotions
       </label>
@@ -592,6 +623,16 @@
     <div class="total-row"><span>Total</span><span id="cartTotal" style="color:var(--navy);">0 GNF</span></div>
     <button class="btn-primary" style="width:100%;" id="checkoutBtn">Commander</button>
     <div class="status-msg" id="checkoutMsg"></div>
+  </div>
+</div>
+
+<!-- RETOUR DU PAIEMENT EN LIGNE -->
+<div class="pay-return" id="payReturn" style="display:none;">
+  <div class="pay-return-card">
+    <div class="pay-return-icon" id="payReturnIcon">⏳</div>
+    <div class="pay-return-title" id="payReturnTitle">Vérification du paiement…</div>
+    <div class="pay-return-text" id="payReturnText"></div>
+    <button class="btn-primary" id="payReturnClose" type="button">Continuer mes achats</button>
   </div>
 </div>
 

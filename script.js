@@ -79,9 +79,14 @@
   function variantsFor(productId){ return variants.filter(v=>v.productId===productId); }
   async function loadOrders(){
     if(!currentUser){ orders = []; return; }
-    const { data, error } = await sb.from('orders')
-      .select('id,ts,customer,phone,address,deliveryZone:delivery_zone,deliveryFee:delivery_fee,items,total,originalTotal:original_total,status,claimedBy:claimed_by')
+    const baseCols = 'id,ts,customer,phone,address,deliveryZone:delivery_zone,deliveryFee:delivery_fee,items,total,originalTotal:original_total,status,claimedBy:claimed_by';
+    let { data, error } = await sb.from('orders')
+      .select(baseCols + ',paymentMethod:payment_method,paymentPhone:payment_phone,paymentRef:payment_ref,paymentStatus:payment_status')
       .order('ts', {ascending:false});
+    if(error){
+      // Base pas encore migrée (supabase/migrations/2026-10-22-paiement.sql) : on charge sans le paiement.
+      ({ data, error } = await sb.from('orders').select(baseCols).order('ts', {ascending:false}));
+    }
     if(error) console.error('loadOrders', error);
     orders = data || [];
   }
@@ -129,12 +134,36 @@
     offlineSales = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories').eq('id', true).maybeSingle();
+    const cols = 'whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories';
+    let { data, error } = await sb.from('settings').select(cols + ',online_payment').eq('id', true).maybeSingle();
+    if(error) ({ data, error } = await sb.from('settings').select(cols).eq('id', true).maybeSingle());
     if(error) console.error('loadSettings', error);
     settings = data || {whatsapp:'', phone:'', facebook:'', orange_money:'', promo_active:false, promo_percent:0, promo_ends_at:null, delivery_enabled:false, delivery_zones:[], categories:[]};
     categories = Array.isArray(settings.categories) ? settings.categories : [];
     deliveryZones = Array.isArray(settings.delivery_zones) ? settings.delivery_zones : [];
   }
+  let paymentMethod = 'livraison';
+  function omNumber(){ return (settings.orange_money||'').trim(); }
+  // Orange Money n'est proposé que si un numéro marchand est renseigné dans Réglages.
+  function renderPaymentOptions(){
+    const om = omNumber();
+    const online = !!settings.online_payment;
+    document.getElementById('payOptOm').style.display = om ? '' : 'none';
+    document.getElementById('payOptOnline').style.display = online ? '' : 'none';
+    document.getElementById('omMerchantNumber').textContent = om;
+    if((paymentMethod==='orange_money' && !om) || (paymentMethod==='en_ligne' && !online)) paymentMethod = 'livraison';
+    document.querySelectorAll('.pay-opt').forEach(b=>b.classList.toggle('active', b.dataset.pay===paymentMethod));
+    document.getElementById('omPanel').style.display = paymentMethod==='orange_money' ? '' : 'none';
+    document.getElementById('onlinePanel').style.display = paymentMethod==='en_ligne' ? '' : 'none';
+    document.getElementById('cashPanel').style.display = paymentMethod==='livraison' ? '' : 'none';
+  }
+  document.querySelectorAll('.pay-opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ paymentMethod = btn.dataset.pay; renderPaymentOptions(); });
+  });
+  document.getElementById('copyOmMerchant').addEventListener('click', async (e)=>{
+    try{ await navigator.clipboard.writeText(omNumber()); e.target.textContent = 'Copié ✓'; }
+    catch(err){ prompt('Copiez ce numéro :', omNumber()); }
+  });
   function deliveryActive(){ return !!settings.delivery_enabled && deliveryZones.length > 0; }
   function parseDeliveryZones(text){
     return String(text||'').split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
@@ -214,6 +243,9 @@
     renderCarousel(); renderCategoryShowcase();
     renderPromoCountdown();
     renderDeliveryZoneOptions();
+    renderPaymentOptions();
+
+    handlePaymentReturn();
 
     const sharedProductId = new URLSearchParams(location.search).get('p');
     if(sharedProductId) scrollToProduct(sharedProductId);
@@ -221,6 +253,37 @@
     const { data:{ session } } = await sb.auth.getSession();
     if(session) await handleAuthSession();
   }
+
+  /* ---------- RETOUR DU PAIEMENT EN LIGNE (?commande=ID&paiement=retour|annule) ---------- */
+  function showPayReturn(icon, title, text){
+    document.getElementById('payReturn').style.display = 'flex';
+    document.getElementById('payReturnIcon').textContent = icon;
+    document.getElementById('payReturnTitle').textContent = title;
+    document.getElementById('payReturnText').textContent = text;
+  }
+  async function handlePaymentReturn(){
+    const params = new URLSearchParams(location.search);
+    const orderId = params.get('commande');
+    const back = params.get('paiement');
+    if(!orderId || !back) return;
+    history.replaceState(null, '', location.pathname);
+    if(back === 'annule'){
+      showPayReturn('✕', 'Paiement annulé', "Votre commande est enregistrée mais n'est pas payée. Notre équipe vous contactera, ou écrivez-nous sur WhatsApp.");
+      return;
+    }
+    showPayReturn('⏳', 'Vérification du paiement…', 'Merci de patienter quelques secondes.');
+    for(let i=0; i<20; i++){
+      try{
+        const res = await fetch('/.netlify/functions/pay-status?commande='+encodeURIComponent(orderId));
+        const data = await res.json();
+        if(data.status === 'reçu'){ showPayReturn('✓', 'Paiement confirmé', 'Merci ! Votre commande est payée. Notre équipe la prépare.'); return; }
+        if(data.status === 'échoué'){ showPayReturn('✕', 'Paiement non abouti', "Le paiement n'a pas été validé. Votre commande est enregistrée : notre équipe vous contactera."); return; }
+      }catch(e){ console.error('pay-status', e); }
+      await new Promise(r=>setTimeout(r, 3000));
+    }
+    showPayReturn('⏳', 'Paiement en cours de vérification', "Nous n'avons pas encore la confirmation d'Orange. Votre commande est enregistrée ; notre équipe vérifiera le paiement.");
+  }
+  document.getElementById('payReturnClose').addEventListener('click', ()=>{ document.getElementById('payReturn').style.display = 'none'; });
 
   async function handleAuthSession(){
     const { data:{ user } } = await sb.auth.getUser();
@@ -508,6 +571,11 @@
     if(num){
       html += `<a class="head-item wa" href="${waLink('Bonjour Joda Boutique, je souhaite commander.')}" target="_blank" rel="noopener">
         <span class="hi-icon">${WA_ICON}</span><span class="hi-text">WhatsApp<small>Commander</small></span></a>`;
+    }
+    const fbUrl = (settings.facebook||'').trim();
+    if(fbUrl){
+      html += `<a class="head-item fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener" title="Notre page Facebook">
+        <span class="hi-icon">${FB_ICON}</span><span class="hi-text">Facebook<small>Notre page</small></span></a>`;
     }
     el.innerHTML = html;
   }
@@ -891,7 +959,7 @@
     const om = (settings.orange_money||'').trim();
     const contact = phoneNum ? '+'+phoneNum : (wa ? 'WhatsApp +'+wa : 'Par message');
     const items = [
-      {icon:'<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', t:'Livraison à Conakry', s: deliveryActive() ? 'Selon votre quartier' : 'Confirmée par téléphone'},
+      {icon:'<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', t:'Livraison partout en Guinée', s: deliveryActive() ? 'Selon votre quartier' : 'Confirmée par téléphone'},
       {icon:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', t:'Paiement facile', s: om ? 'Orange Money accepté' : 'Confirmé avec l\'équipe'},
       {icon:'<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" stroke-linejoin="round"/>', t:'Qualité garantie', s:'Pièces choisies à la main'},
       {icon:'<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', t:'Service client', s: contact},
@@ -923,10 +991,10 @@
     return items;
   }
   const HERO_FEATURES = [
-    ['<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" stroke-linejoin="round"/>', 'Qualité<br>garantie'],
-    ['<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', 'Livraison<br>à Conakry'],
-    ['<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', 'Commande<br>rapide'],
-    ['<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', 'Service<br>client']
+    ['<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" stroke-linejoin="round"/>', 'Qualité <br>garantie'],
+    ['<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', 'Livraison <br>partout en Guinée'],
+    ['<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', 'Commande <br>rapide'],
+    ['<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', 'Service <br>client']
   ];
   function heroSlideHtml(item){
     const catNames = groupByCategory(products.filter(isApproved)).slice(0,4).map(g=>escapeHtml(g.name)).join(' • ');
@@ -1111,13 +1179,29 @@
     if(!name){ msg.textContent = "Merci d'indiquer votre nom."; return; }
     if(!phone){ msg.textContent = "Merci d'indiquer votre numéro de téléphone (chiffres uniquement)."; return; }
     if(!address){ msg.textContent = "Merci d'indiquer votre adresse de livraison."; return; }
+    const payerPhone = document.getElementById('omPayerPhone').value.replace(/[^0-9]/g,'');
+    const payRef = document.getElementById('omPayRef').value.trim();
+    if(paymentMethod==='orange_money' && !payerPhone){ msg.textContent = "Merci d'indiquer le numéro Orange Money qui paie."; return; }
+    const payLabel = paymentMethod==='orange_money'
+      ? `Orange Money (n° ${payerPhone}${payRef ? ', réf. '+payRef : ', référence à envoyer'})`
+      : paymentMethod==='en_ligne' ? 'Paiement en ligne Orange Money' : 'À la livraison';
     const items = keys.map(key=>{
       const {productId, variantId} = parseCartKey(key);
       return variantId ? {id:productId, qty:cart[key], variantId} : {id:productId, qty:cart[key]};
     });
 
     msg.textContent = 'Envoi en cours…';
-    const { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address, p_delivery_zone:deliveryZone});
+    let { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address, p_delivery_zone:deliveryZone,
+      p_payment_method:paymentMethod, p_payment_phone:paymentMethod==='orange_money' ? payerPhone : null, p_payment_ref:payRef || null});
+    if(error && error.code === 'PGRST202' && paymentMethod==='en_ligne'){
+      msg.textContent = "Le paiement en ligne n'est pas encore disponible. Choisissez un autre mode de paiement.";
+      return;
+    }
+    if(error && error.code === 'PGRST202'){
+      // Base pas encore migrée : ancienne fonction, le paiement est noté dans l'adresse pour l'équipe.
+      ({ data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items,
+        p_address:`${address} — Paiement : ${payLabel}`, p_delivery_zone:deliveryZone}));
+    }
     if(error){
       msg.textContent = "La commande n'a pas pu être enregistrée (stock insuffisant ou erreur de connexion). Réessayez.";
       return;
@@ -1134,6 +1218,21 @@
       subscribeToPush(data.id, name).catch(e=>console.error('push opt-in', e));
     }
 
+    if(paymentMethod==='en_ligne'){
+      document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value=''; document.getElementById('custDeliveryZone').value='';
+      msg.textContent = 'Commande enregistrée. Redirection vers Orange Money…';
+      try{
+        const res = await fetch('/.netlify/functions/pay-start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({orderId: data.id})});
+        const pay = await res.json();
+        if(res.ok && pay.paymentUrl){ location.href = pay.paymentUrl; return; }
+        console.error('pay-start', res.status, pay);
+      }catch(e){ console.error('pay-start', e); }
+      const wa = waLink(`Bonjour Joda Boutique, ma commande ${data.id} est enregistrée mais le paiement en ligne n'a pas fonctionné.`);
+      msg.innerHTML = "Commande enregistrée, mais le paiement en ligne n'a pas pu démarrer. Notre équipe vous contacte pour le paiement."
+        + (wa ? `<div class="checkout-wa"><a class="wa-btn" href="${wa}" target="_blank" rel="noopener">${WA_ICON} Nous écrire sur WhatsApp</a></div>` : '');
+      return;
+    }
+
     const orderItems = data.items || [];
     const total = data.total || 0;
     const deliveryFee = data.deliveryFee || 0;
@@ -1143,12 +1242,16 @@
       + `%0ATotal articles : ${money(total)}`
       + (deliveryZone ? `%0ALivraison (${deliveryZone})${deliveryFee ? ' : '+money(deliveryFee) : ' : à convenir'}` : '')
       + `%0ATotal à payer : ${money(grandTotal)}`
+      + `%0APaiement : ${payLabel}`
       + `%0ANom : ${name}` + (phone ? `%0ATéléphone : ${phone}` : '') + (address ? `%0AAdresse : ${address}` : '');
     const waHref = waLink(decodeURIComponent(recap));
     const contactItems = buildContactItems(false);
-    const orangeMoney = (settings.orange_money||'').trim();
+    const orangeMoney = paymentMethod==='orange_money' ? omNumber() : '';
     msg.innerHTML = 'Commande envoyée ! Merci ' + escapeHtml(name) + '. Total à payer : ' + money(grandTotal) + '.'
-      + (orangeMoney ? `<div class="checkout-om"><span class="om-label">Dépôt Orange Money</span><span class="om-number">${escapeHtml(orangeMoney)}</span><button type="button" class="btn-mini" id="copyOmBtn">Copier</button></div>` : '')
+      + (paymentMethod==='orange_money'
+          ? (payRef ? ' Nous vérifions votre paiement Orange Money.' : ' Pensez à envoyer le paiement Orange Money puis la référence par WhatsApp.')
+          : ' Vous paierez à la livraison.')
+      + (orangeMoney && !payRef ? `<div class="checkout-om"><span class="om-label">Dépôt Orange Money</span><span class="om-number">${escapeHtml(orangeMoney)}</span><button type="button" class="btn-mini" id="copyOmBtn">Copier</button></div>` : '')
       + (waHref ? `<div class="checkout-wa"><a class="wa-btn" href="${waHref}" target="_blank" rel="noopener">${WA_ICON} Confirmer sur WhatsApp</a></div>` : '')
       + (contactItems ? `<p class="section-note" style="margin:12px 0 4px;">Vous pouvez aussi nous joindre directement :</p><div class="checkout-contact-list">${contactItems}</div>` : '');
     const copyOmBtn = document.getElementById('copyOmBtn');
@@ -1157,6 +1260,7 @@
       catch(e){ prompt('Copiez ce numéro :', orangeMoney); }
     });
     document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value=''; document.getElementById('custDeliveryZone').value='';
+    document.getElementById('omPayerPhone').value=''; document.getElementById('omPayRef').value='';
     setTimeout(()=>{ if(!waHref && !contactItems && !orangeMoney){ msg.textContent=''; closeDrawer(); } }, 4000);
   });
 
@@ -2195,6 +2299,20 @@ Données des 7 derniers jours :
         ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
         : money(o.total);
       const open = expandedOrderIds.has(o.id);
+      const payName = {orange_money:'Orange Money', en_ligne:'En ligne', livraison:'Livraison'}[o.paymentMethod] || '';
+      const payPill = !o.paymentMethod ? ''
+        : o.paymentStatus==='reçu' ? `<br><span class="pay-pill paid">${payName} · payé ✓</span>`
+        : o.paymentStatus==='échoué' ? `<br><span class="pay-pill failed">${payName} · échoué</span>`
+        : o.paymentMethod==='orange_money' ? '<br><span class="pay-pill om">Orange Money · à vérifier</span>'
+        : o.paymentMethod==='en_ligne' ? '<br><span class="pay-pill online">En ligne · en attente</span>'
+        : '<br><span class="pay-pill cash">À la livraison</span>';
+      const payLine = !o.paymentMethod ? ''
+        : `<div><strong>Paiement :</strong> ${o.paymentMethod==='orange_money'
+            ? `Orange Money — n° ${escapeHtml(o.paymentPhone||'—')}, réf. ${o.paymentRef ? escapeHtml(o.paymentRef) : 'non fournie'}`
+            : o.paymentMethod==='en_ligne' ? `En ligne Orange Money${o.paymentRef ? ' — réf. '+escapeHtml(o.paymentRef) : ''}`
+            : 'À la livraison (espèces)'} — ${o.paymentStatus==='reçu' ? '<strong style="color:#1B7A3D;">reçu ✓</strong>' : escapeHtml(o.paymentStatus||'en attente')}
+            ${o.paymentStatus!=='reçu' && o.status!=='annulée' && (isAdmin || o.claimedBy===currentUser.id)
+              ? `<button class="btn-mini" data-act="paid" data-id="${o.id}" style="margin-left:8px;">Marquer payé</button>` : ''}</div>`;
       const deliveryLine = o.deliveryZone
         ? `${escapeHtml(o.deliveryZone)}${o.deliveryFee ? ' — '+money(o.deliveryFee)+' (non compté dans les statistiques)' : ' (prix à convenir)'}`
         : 'Aucune';
@@ -2202,7 +2320,7 @@ Données des 7 derniers jours :
         <td>${new Date(o.ts).toLocaleString('fr-FR')}</td>
         <td>${escapeHtml(o.customer)}${o.phone ? ' · '+escapeHtml(o.phone) : ''}</td>
         <td>${o.items.map(it=>escapeHtml(it.name)+(it.color?' ('+escapeHtml(it.color)+')':'')+' ×'+it.qty).join(', ')}</td>
-        <td>${totalCell}</td>
+        <td>${totalCell}${payPill}</td>
         <td><span class="pill ${pillClass}">${o.status}</span></td>
         <td>${o.claimedBy ? escapeHtml(teamName(o.claimedBy)) : '—'}</td>
         <td>${actionBtns}</td>
@@ -2213,6 +2331,7 @@ Données des 7 derniers jours :
             <div><strong>Téléphone :</strong> ${o.phone ? escapeHtml(o.phone) : '—'}</div>
             <div><strong>Adresse :</strong> ${o.address ? escapeHtml(o.address) : '—'}</div>
             <div><strong>Livraison :</strong> ${deliveryLine}</div>
+            ${payLine}
           </div>
         </td>
       </tr>`;
@@ -2244,6 +2363,10 @@ Données des 7 derniers jours :
             sendPush('Votre commande est prête',
               `Bonjour ${o.customer}, votre commande Joda Boutique est prête. Merci de votre confiance !`, o.id);
           }
+        } else if(btn.dataset.act==='paid'){
+          const { error } = await sb.from('orders').update({payment_status:'reçu'}).eq('id', o.id);
+          if(!error) await logActivity(currentUser.name, 'a confirmé le paiement de la commande de '+o.customer);
+          else alert('Erreur : '+error.message);
         } else if(btn.dataset.act==='adjust'){
           const nv = prompt('Prix de vente final pour la commande de '+o.customer+' (le client a peut-être négocié une réduction).\nTotal actuel : '+money(o.total), o.total);
           if(nv===null) return;
@@ -2443,6 +2566,7 @@ Données des 7 derniers jours :
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';
     document.getElementById('setOrangeMoney').value = settings.orange_money || '';
+    document.getElementById('setOnlinePayment').checked = !!settings.online_payment;
     document.getElementById('setPromoActive').checked = !!settings.promo_active;
     document.getElementById('setPromoPercent').value = settings.promo_percent || '';
     document.getElementById('setPromoEndsAt').value = settings.promo_ends_at ? toLocalDatetimeInput(settings.promo_ends_at) : '';
@@ -2466,11 +2590,12 @@ Données des 7 derniers jours :
     const fb = document.getElementById('setFacebook').value.trim();
     const om = document.getElementById('setOrangeMoney').value.replace(/[^0-9]/g,'');
     const msg = document.getElementById('contactMsg');
-    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb, orange_money: om}).eq('id', true);
+    const online = document.getElementById('setOnlinePayment').checked;
+    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb, orange_money: om, online_payment: online}).eq('id', true);
     if(error){ msg.textContent = 'Erreur : '+error.message; return; }
     await loadSettings();
     msg.textContent = 'Coordonnées enregistrées.';
-    renderContactBar();
+    renderContactBar(); renderPaymentOptions();
     setTimeout(()=>msg.textContent='',3000);
   });
 
