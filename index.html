@@ -308,7 +308,7 @@
         <div class="panel">
           <h4>Historique par semaine (8 dernières semaines)</h4>
           <div class="table-scroll"><table class="admin-table">
-            <thead><tr><th>Semaine</th><th>Commandes</th><th>Articles vendus</th><th>Ventes</th><th>Dépenses</th><th>Commissions</th><th>Net après commissions</th></tr></thead>
+            <thead><tr><th>Semaine</th><th>Commandes traitées</th><th>Articles vendus</th><th>Ventes</th><th>Dépenses</th><th>Commissions</th><th>Net après commissions</th></tr></thead>
             <tbody id="weekHistoryBody"></tbody>
           </table></div>
         </div>
@@ -442,7 +442,7 @@
         <div class="panel">
           <h4>Mon historique par semaine (8 dernières semaines)</h4>
           <div class="table-scroll"><table class="admin-table">
-            <thead><tr><th>Semaine</th><th>Commandes prises</th><th>Ventes traitées</th><th>Ma commission</th><th>Net boutique après ma commission</th></tr></thead>
+            <thead><tr><th>Semaine</th><th>Commandes traitées</th><th>Ventes traitées</th><th>Ma commission</th><th>Net boutique après ma commission</th></tr></thead>
             <tbody id="myWeekHistoryBody"></tbody>
           </table></div>
         </div>
@@ -672,9 +672,12 @@
 </div>
 
 <!-- PROMOTION COUNTDOWN (pinned, visible partout) -->
-<div class="promo-countdown" id="promoCountdown" style="display:none;">
-  <span class="pc-icon">🔥</span>
-  <span id="promoCountdownText"></span>
+<div class="promo-countdown pos-0" id="promoCountdown" role="button" tabindex="0" title="Voir les pièces en promotion" style="display:none;">
+  <span class="pc-pct" id="promoPct"></span>
+  <span class="pc-body">
+    <span class="pc-title">🔥 Promotion</span>
+    <span class="pc-text" id="promoCountdownText"></span>
+  </span>
 </div>
 
 <!-- CHATBOT -->
