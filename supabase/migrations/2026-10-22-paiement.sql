@@ -1,17 +1,29 @@
 -- ============================================================
--- Joda Boutique — ajout du mode de paiement (Orange Money / à la livraison)
+-- Joda Boutique — modes de paiement (Orange Money, paiement en ligne, à la livraison)
 -- Pour une base DÉJÀ installée : Supabase > SQL Editor > New query,
--- collez tout ce fichier puis cliquez Run. Sans risque si exécuté deux fois.
+-- collez tout ce fichier puis cliquez Run. Sans risque si exécuté plusieurs fois.
 -- (schema.sql contient déjà ces changements pour une nouvelle installation.)
 -- ============================================================
 
 -- Mode de paiement choisi par la cliente (bases existantes : colonnes ajoutées ici).
-alter table orders add column if not exists payment_method text not null default 'livraison'
-  check (payment_method in ('orange_money','livraison'));
+--   orange_money : transfert manuel au numéro de la boutique, vérifié par l'équipe
+--   en_ligne     : paiement Orange Money Web Payment, confirmé automatiquement
+--   livraison    : espèces à la réception
+alter table orders add column if not exists payment_method text not null default 'livraison';
 alter table orders add column if not exists payment_phone text;
 alter table orders add column if not exists payment_ref text;
-alter table orders add column if not exists payment_status text not null default 'en attente'
-  check (payment_status in ('en attente','reçu'));
+alter table orders add column if not exists payment_status text not null default 'en attente';
+alter table orders add column if not exists pay_token text;    -- jeton Orange (paiement en ligne)
+alter table orders add column if not exists notif_token text;  -- jeton de notification Orange
+alter table orders drop constraint if exists orders_payment_method_check;
+alter table orders add constraint orders_payment_method_check
+  check (payment_method in ('orange_money','en_ligne','livraison'));
+alter table orders drop constraint if exists orders_payment_status_check;
+alter table orders add constraint orders_payment_status_check
+  check (payment_status in ('en attente','reçu','échoué'));
+
+-- Paiement en ligne Orange Money : activé depuis Réglages une fois les clés Orange configurées sur Netlify.
+alter table settings add column if not exists online_payment boolean default false;
 
 drop function if exists place_order(text, text, jsonb);
 drop function if exists place_order(text, text, jsonb, text);
@@ -22,7 +34,7 @@ create or replace function place_order(
   p_items jsonb,  -- [{"id": "...", "qty": 2, "variantId": "..." (optionnel)}, ...]
   p_address text default null,
   p_delivery_zone text default null,
-  p_payment_method text default 'livraison',  -- 'orange_money' ou 'livraison'
+  p_payment_method text default 'livraison',  -- 'orange_money', 'en_ligne' ou 'livraison'
   p_payment_phone text default null,          -- numéro Orange Money qui a payé
   p_payment_ref text default null             -- référence de transaction (SMS)
 ) returns jsonb
@@ -66,13 +78,15 @@ begin
     raise exception 'Le panier est vide';
   end if;
   p_payment_method := coalesce(nullif(trim(p_payment_method), ''), 'livraison');
-  if p_payment_method not in ('orange_money','livraison') then
+  if p_payment_method not in ('orange_money','en_ligne','livraison') then
     raise exception 'Mode de paiement invalide';
   end if;
   if p_payment_method = 'orange_money' then
     if p_payment_phone is null or trim(p_payment_phone) !~ '^[0-9]+$' then
       raise exception 'Numéro Orange Money invalide (chiffres uniquement)';
     end if;
+  elsif p_payment_method = 'en_ligne' then
+    p_payment_ref := null;  -- la référence vient d'Orange, pas de la cliente
   else
     p_payment_phone := null;
     p_payment_ref := null;

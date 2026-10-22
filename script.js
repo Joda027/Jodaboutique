@@ -134,7 +134,9 @@
     offlineSales = data || [];
   }
   async function loadSettings(){
-    const { data, error } = await sb.from('settings').select('whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories').eq('id', true).maybeSingle();
+    const cols = 'whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories';
+    let { data, error } = await sb.from('settings').select(cols + ',online_payment').eq('id', true).maybeSingle();
+    if(error) ({ data, error } = await sb.from('settings').select(cols).eq('id', true).maybeSingle());
     if(error) console.error('loadSettings', error);
     settings = data || {whatsapp:'', phone:'', facebook:'', orange_money:'', promo_active:false, promo_percent:0, promo_ends_at:null, delivery_enabled:false, delivery_zones:[], categories:[]};
     categories = Array.isArray(settings.categories) ? settings.categories : [];
@@ -145,11 +147,14 @@
   // Orange Money n'est proposé que si un numéro marchand est renseigné dans Réglages.
   function renderPaymentOptions(){
     const om = omNumber();
+    const online = !!settings.online_payment;
     document.getElementById('payOptOm').style.display = om ? '' : 'none';
+    document.getElementById('payOptOnline').style.display = online ? '' : 'none';
     document.getElementById('omMerchantNumber').textContent = om;
-    if(!om) paymentMethod = 'livraison';
+    if((paymentMethod==='orange_money' && !om) || (paymentMethod==='en_ligne' && !online)) paymentMethod = 'livraison';
     document.querySelectorAll('.pay-opt').forEach(b=>b.classList.toggle('active', b.dataset.pay===paymentMethod));
     document.getElementById('omPanel').style.display = paymentMethod==='orange_money' ? '' : 'none';
+    document.getElementById('onlinePanel').style.display = paymentMethod==='en_ligne' ? '' : 'none';
     document.getElementById('cashPanel').style.display = paymentMethod==='livraison' ? '' : 'none';
   }
   document.querySelectorAll('.pay-opt').forEach(btn=>{
@@ -240,12 +245,45 @@
     renderDeliveryZoneOptions();
     renderPaymentOptions();
 
+    handlePaymentReturn();
+
     const sharedProductId = new URLSearchParams(location.search).get('p');
     if(sharedProductId) scrollToProduct(sharedProductId);
 
     const { data:{ session } } = await sb.auth.getSession();
     if(session) await handleAuthSession();
   }
+
+  /* ---------- RETOUR DU PAIEMENT EN LIGNE (?commande=ID&paiement=retour|annule) ---------- */
+  function showPayReturn(icon, title, text){
+    document.getElementById('payReturn').style.display = 'flex';
+    document.getElementById('payReturnIcon').textContent = icon;
+    document.getElementById('payReturnTitle').textContent = title;
+    document.getElementById('payReturnText').textContent = text;
+  }
+  async function handlePaymentReturn(){
+    const params = new URLSearchParams(location.search);
+    const orderId = params.get('commande');
+    const back = params.get('paiement');
+    if(!orderId || !back) return;
+    history.replaceState(null, '', location.pathname);
+    if(back === 'annule'){
+      showPayReturn('✕', 'Paiement annulé', "Votre commande est enregistrée mais n'est pas payée. Notre équipe vous contactera, ou écrivez-nous sur WhatsApp.");
+      return;
+    }
+    showPayReturn('⏳', 'Vérification du paiement…', 'Merci de patienter quelques secondes.');
+    for(let i=0; i<20; i++){
+      try{
+        const res = await fetch('/.netlify/functions/pay-status?commande='+encodeURIComponent(orderId));
+        const data = await res.json();
+        if(data.status === 'reçu'){ showPayReturn('✓', 'Paiement confirmé', 'Merci ! Votre commande est payée. Notre équipe la prépare.'); return; }
+        if(data.status === 'échoué'){ showPayReturn('✕', 'Paiement non abouti', "Le paiement n'a pas été validé. Votre commande est enregistrée : notre équipe vous contactera."); return; }
+      }catch(e){ console.error('pay-status', e); }
+      await new Promise(r=>setTimeout(r, 3000));
+    }
+    showPayReturn('⏳', 'Paiement en cours de vérification', "Nous n'avons pas encore la confirmation d'Orange. Votre commande est enregistrée ; notre équipe vérifiera le paiement.");
+  }
+  document.getElementById('payReturnClose').addEventListener('click', ()=>{ document.getElementById('payReturn').style.display = 'none'; });
 
   async function handleAuthSession(){
     const { data:{ user } } = await sb.auth.getUser();
@@ -1146,7 +1184,7 @@
     if(paymentMethod==='orange_money' && !payerPhone){ msg.textContent = "Merci d'indiquer le numéro Orange Money qui paie."; return; }
     const payLabel = paymentMethod==='orange_money'
       ? `Orange Money (n° ${payerPhone}${payRef ? ', réf. '+payRef : ', référence à envoyer'})`
-      : 'À la livraison';
+      : paymentMethod==='en_ligne' ? 'Paiement en ligne Orange Money' : 'À la livraison';
     const items = keys.map(key=>{
       const {productId, variantId} = parseCartKey(key);
       return variantId ? {id:productId, qty:cart[key], variantId} : {id:productId, qty:cart[key]};
@@ -1155,6 +1193,10 @@
     msg.textContent = 'Envoi en cours…';
     let { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address, p_delivery_zone:deliveryZone,
       p_payment_method:paymentMethod, p_payment_phone:paymentMethod==='orange_money' ? payerPhone : null, p_payment_ref:payRef || null});
+    if(error && error.code === 'PGRST202' && paymentMethod==='en_ligne'){
+      msg.textContent = "Le paiement en ligne n'est pas encore disponible. Choisissez un autre mode de paiement.";
+      return;
+    }
     if(error && error.code === 'PGRST202'){
       // Base pas encore migrée : ancienne fonction, le paiement est noté dans l'adresse pour l'équipe.
       ({ data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items,
@@ -1174,6 +1216,21 @@
     const optIn = document.getElementById('notifyOptIn');
     if(optIn && optIn.checked && pushSupported()){
       subscribeToPush(data.id, name).catch(e=>console.error('push opt-in', e));
+    }
+
+    if(paymentMethod==='en_ligne'){
+      document.getElementById('custName').value=''; document.getElementById('custPhone').value=''; document.getElementById('custAddress').value=''; document.getElementById('custDeliveryZone').value='';
+      msg.textContent = 'Commande enregistrée. Redirection vers Orange Money…';
+      try{
+        const res = await fetch('/.netlify/functions/pay-start', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({orderId: data.id})});
+        const pay = await res.json();
+        if(res.ok && pay.paymentUrl){ location.href = pay.paymentUrl; return; }
+        console.error('pay-start', res.status, pay);
+      }catch(e){ console.error('pay-start', e); }
+      const wa = waLink(`Bonjour Joda Boutique, ma commande ${data.id} est enregistrée mais le paiement en ligne n'a pas fonctionné.`);
+      msg.innerHTML = "Commande enregistrée, mais le paiement en ligne n'a pas pu démarrer. Notre équipe vous contacte pour le paiement."
+        + (wa ? `<div class="checkout-wa"><a class="wa-btn" href="${wa}" target="_blank" rel="noopener">${WA_ICON} Nous écrire sur WhatsApp</a></div>` : '');
+      return;
     }
 
     const orderItems = data.items || [];
@@ -2242,14 +2299,18 @@ Données des 7 derniers jours :
         ? `<span style="text-decoration:line-through;color:var(--muted);font-size:11px;">${money(o.originalTotal)}</span><br>${money(o.total)}`
         : money(o.total);
       const open = expandedOrderIds.has(o.id);
+      const payName = {orange_money:'Orange Money', en_ligne:'En ligne', livraison:'Livraison'}[o.paymentMethod] || '';
       const payPill = !o.paymentMethod ? ''
-        : o.paymentStatus==='reçu' ? `<br><span class="pay-pill paid">${o.paymentMethod==='orange_money' ? 'Orange Money' : 'Livraison'} · payé ✓</span>`
+        : o.paymentStatus==='reçu' ? `<br><span class="pay-pill paid">${payName} · payé ✓</span>`
+        : o.paymentStatus==='échoué' ? `<br><span class="pay-pill failed">${payName} · échoué</span>`
         : o.paymentMethod==='orange_money' ? '<br><span class="pay-pill om">Orange Money · à vérifier</span>'
+        : o.paymentMethod==='en_ligne' ? '<br><span class="pay-pill online">En ligne · en attente</span>'
         : '<br><span class="pay-pill cash">À la livraison</span>';
       const payLine = !o.paymentMethod ? ''
         : `<div><strong>Paiement :</strong> ${o.paymentMethod==='orange_money'
             ? `Orange Money — n° ${escapeHtml(o.paymentPhone||'—')}, réf. ${o.paymentRef ? escapeHtml(o.paymentRef) : 'non fournie'}`
-            : 'À la livraison (espèces)'} — ${o.paymentStatus==='reçu' ? '<strong style="color:#1B7A3D;">reçu ✓</strong>' : 'en attente'}
+            : o.paymentMethod==='en_ligne' ? `En ligne Orange Money${o.paymentRef ? ' — réf. '+escapeHtml(o.paymentRef) : ''}`
+            : 'À la livraison (espèces)'} — ${o.paymentStatus==='reçu' ? '<strong style="color:#1B7A3D;">reçu ✓</strong>' : escapeHtml(o.paymentStatus||'en attente')}
             ${o.paymentStatus!=='reçu' && o.status!=='annulée' && (isAdmin || o.claimedBy===currentUser.id)
               ? `<button class="btn-mini" data-act="paid" data-id="${o.id}" style="margin-left:8px;">Marquer payé</button>` : ''}</div>`;
       const deliveryLine = o.deliveryZone
@@ -2505,6 +2566,7 @@ Données des 7 derniers jours :
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';
     document.getElementById('setOrangeMoney').value = settings.orange_money || '';
+    document.getElementById('setOnlinePayment').checked = !!settings.online_payment;
     document.getElementById('setPromoActive').checked = !!settings.promo_active;
     document.getElementById('setPromoPercent').value = settings.promo_percent || '';
     document.getElementById('setPromoEndsAt').value = settings.promo_ends_at ? toLocalDatetimeInput(settings.promo_ends_at) : '';
@@ -2528,7 +2590,8 @@ Données des 7 derniers jours :
     const fb = document.getElementById('setFacebook').value.trim();
     const om = document.getElementById('setOrangeMoney').value.replace(/[^0-9]/g,'');
     const msg = document.getElementById('contactMsg');
-    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb, orange_money: om}).eq('id', true);
+    const online = document.getElementById('setOnlinePayment').checked;
+    const { error } = await sb.from('settings').update({whatsapp: wa, phone: ph, facebook: fb, orange_money: om, online_payment: online}).eq('id', true);
     if(error){ msg.textContent = 'Erreur : '+error.message; return; }
     await loadSettings();
     msg.textContent = 'Coordonnées enregistrées.';
