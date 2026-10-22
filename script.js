@@ -1550,10 +1550,13 @@
   });
 
   /* ---------- STATS TAB ---------- */
+  // Seules les commandes traitées comptent dans les statistiques et les finances
+  // (les nouvelles, en cours et annulées en sont exclues).
+  function isCounted(o){ return o.status==='traitée'; }
   function soldQuantities(filterFn){
     const map = {};
     orders.forEach(o=>{
-      if(o.status==='annulée') return;
+      if(!isCounted(o)) return;
       if(filterFn && !filterFn(o)) return;
       o.items.forEach(it=>{
         if(!map[it.name]) map[it.name] = {qty:0, revenue:0};
@@ -1566,7 +1569,7 @@
   function locationStats(){
     const map = {};
     orders.forEach(o=>{
-      if(o.status==='annulée') return;
+      if(!isCounted(o)) return;
       const loc = (o.address && o.address.trim()) || 'Non précisé';
       if(!map[loc]) map[loc] = {count:0, revenue:0};
       map[loc].count++;
@@ -1589,7 +1592,7 @@
     renderWeekPanel();
     const now = Date.now();
     const weekAgo = now - 7*86400000;
-    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && o.status!=='annulée');
+    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && isCounted(o));
     const weekOffline = offlineSales.filter(o=> o.ts && o.ts >= weekAgo).reduce((s,o)=>s+Number(o.amount||0),0);
     const weekRevenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0) + weekOffline;
     const weekItems = weekOrders.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
@@ -1598,7 +1601,7 @@
     const t = traffic[curWeek] || {visits:0, clicks:0};
 
     document.getElementById('statsTopGrid').innerHTML = `
-      <div class="stat-card"><div class="num">${weekOrders.length}</div><div class="lbl">Commandes cette semaine</div></div>
+      <div class="stat-card"><div class="num">${weekOrders.length}</div><div class="lbl">Commandes traitées (7 jours)</div></div>
       <div class="stat-card"><div class="num">${weekItems}</div><div class="lbl">Articles vendus (7 jours)</div></div>
       <div class="stat-card"><div class="num">${weekRevenue.toLocaleString('fr-FR')}</div><div class="lbl">Ventes 7 jours (GNF)</div></div>
       <div class="stat-card"><div class="num">${totalStock}</div><div class="lbl">Pièces en stock</div></div>
@@ -1670,7 +1673,7 @@
     `;
 
     const weekMap = {};
-    mineWeek.filter(o=>o.status!=='annulée').forEach(o=> o.items.forEach(it=>{ weekMap[it.name] = (weekMap[it.name]||0) + it.qty; }));
+    mineWeek.filter(isCounted).forEach(o=> o.items.forEach(it=>{ weekMap[it.name] = (weekMap[it.name]||0) + it.qty; }));
     barChart(document.getElementById('myWeeklySales'),
       Object.entries(weekMap).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,10), ' vendu(s)');
 
@@ -1730,7 +1733,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
 
   function monthFinancials(refTs){
     const mk = monthKey(refTs);
-    const monthOrders = orders.filter(o=> o.ts && monthKey(o.ts)===mk && o.status!=='annulée');
+    const monthOrders = orders.filter(o=> o.ts && monthKey(o.ts)===mk && isCounted(o));
     const onsiteRevenue = monthOrders.reduce((s,o)=>s+Number(o.total||0),0);
     const monthOffline = offlineSales.filter(o=> monthKey(o.ts)===mk);
     const offlineTotal = monthOffline.reduce((s,o)=>s+Number(o.amount||0),0);
@@ -1755,7 +1758,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
   }
   function weekFinancials(refTs){
     const {start,end} = weekBounds(refTs);
-    const weekOrders = orders.filter(o=> o.ts>=start && o.ts<=end && o.status!=='annulée');
+    const weekOrders = orders.filter(o=> o.ts>=start && o.ts<=end && isCounted(o));
     const onsiteRevenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0);
     const weekOffline = offlineSales.filter(o=> o.ts>=start && o.ts<=end);
     const offlineTotal = weekOffline.reduce((s,o)=>s+Number(o.amount||0),0);
@@ -1764,7 +1767,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     const totalExp = weekExpenses.reduce((s,e)=>s+Number(e.amount),0);
     const itemsSold = weekOrders.reduce((s,o)=>s+o.items.reduce((x,it)=>x+it.qty,0),0);
     const totalCom = team.filter(t=>t.role==='assistant').reduce((sum,a)=>{
-      const mine = assistantOrders(a.id, o=> o.ts>=start && o.ts<=end && o.status!=='annulée');
+      const mine = assistantOrders(a.id, o=> o.ts>=start && o.ts<=end && isCounted(o));
       return sum + commissionOf(mine);
     }, 0);
     const netProfit = revenue - totalExp - totalCom;
@@ -1782,7 +1785,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     document.getElementById('weekNextBtn').disabled = statsWeekOffset >= 0;
 
     grid.innerHTML = `
-      <div class="stat-card"><div class="num">${f.weekOrders.length}</div><div class="lbl">Commandes</div></div>
+      <div class="stat-card"><div class="num">${f.weekOrders.length}</div><div class="lbl">Commandes traitées</div></div>
       <div class="stat-card"><div class="num">${f.itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${f.revenue.toLocaleString('fr-FR')}</div><div class="lbl">Ventes (GNF)</div></div>
       <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses (GNF)</div></div>
@@ -1820,7 +1823,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     const now = Date.now();
     const refTs = now + myWeekOffset*7*86400000;
     const {start,end} = weekBounds(refTs);
-    const mine = assistantOrders(currentUser.id, o=> o.ts>=start && o.ts<=end && o.status!=='annulée');
+    const mine = assistantOrders(currentUser.id, o=> o.ts>=start && o.ts<=end && isCounted(o));
     const treated = mine.filter(o=>o.status==='traitée');
     const sales = treated.reduce((s,o)=>s+o.total,0);
     const com = commissionOf(mine);
@@ -1831,7 +1834,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
 
     const netAfterCom = sales - com;
     grid.innerHTML = `
-      <div class="stat-card"><div class="num">${mine.length}</div><div class="lbl">Commandes prises</div></div>
+      <div class="stat-card"><div class="num">${mine.length}</div><div class="lbl">Commandes traitées</div></div>
       <div class="stat-card"><div class="num">${itemsSold}</div><div class="lbl">Articles vendus</div></div>
       <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes traitées (GNF)</div></div>
       <div class="stat-card commission-highlight"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Ma commission (GNF)</div></div>
@@ -1847,7 +1850,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
     for(let i=7;i>=0;i--){
       const wTs = now - i*7*86400000;
       const {start:ws, end:we} = weekBounds(wTs);
-      const wMine = assistantOrders(currentUser.id, o=> o.ts>=ws && o.ts<=we && o.status!=='annulée');
+      const wMine = assistantOrders(currentUser.id, o=> o.ts>=ws && o.ts<=we && isCounted(o));
       const wTreated = wMine.filter(o=>o.status==='traitée');
       const wSales = wTreated.reduce((s,o)=>s+o.total,0);
       const wCom = commissionOf(wMine);
@@ -1863,7 +1866,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
 
   // Cumul « depuis toujours » : commandes en base + ventes hors site + résumé archivé.
   function renderCumulPanel(){
-    const live = orders.filter(o=>o.ts && o.status!=='annulée');
+    const live = orders.filter(o=>o.ts && isCounted(o));
     const arch = salesArchive || {count:0, revenue:0, byAssistant:{}};
     const assistants = team.filter(t=>t.role==='assistant');
     const assistantRows = assistants.map(a=>{
@@ -1938,7 +1941,7 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
       <div class="stat-card"><div class="num">${f.totalExp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses du mois (GNF)</div></div>
       <div class="stat-card"><div class="num">${totalCom.toLocaleString('fr-FR')}</div><div class="lbl">Commissions (10%)</div></div>
       <div class="stat-card net-highlight"><div class="num">${netProfit.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net (GNF)</div></div>
-      <div class="stat-card"><div class="num">${f.monthOrders.length}</div><div class="lbl">Commandes du mois</div></div>
+      <div class="stat-card"><div class="num">${f.monthOrders.length}</div><div class="lbl">Commandes traitées du mois</div></div>
     `;
 
     document.getElementById('commissionsBody').innerHTML = comRows.map(r=>`
@@ -2082,7 +2085,7 @@ Données du mois (${monthLabel(Date.now())}) :
     box.textContent = 'Analyse en cours…';
     const now = Date.now();
     const weekAgo = now - 7*86400000;
-    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && o.status!=='annulée');
+    const weekOrders = orders.filter(o=> o.ts && o.ts >= weekAgo && isCounted(o));
     const weekOfflineTotal = offlineSales.filter(o=> o.ts >= weekAgo).reduce((s,o)=>s+Number(o.amount||0),0);
     const revenue = weekOrders.reduce((s,o)=>s+Number(o.total||0),0) + weekOfflineTotal;
     const weekExpenses = expenses.filter(e=> e.ts >= weekAgo);
@@ -2762,12 +2765,13 @@ Données des 7 derniers jours :
     const msg = document.getElementById('resetMsg');
     msg.textContent = 'Réinitialisation en cours…';
     try{
+      const counted = orders.filter(isCounted);
       const newArchive = {
-        count: (salesArchive.count||0) + orders.length,
-        revenue: (salesArchive.revenue||0) + orders.reduce((s,o)=>s+Number(o.total||0),0),
+        count: (salesArchive.count||0) + counted.length,
+        revenue: (salesArchive.revenue||0) + counted.reduce((s,o)=>s+Number(o.total||0),0),
         byProduct: Object.assign({}, salesArchive.byProduct||{})
       };
-      orders.forEach(o=> (Array.isArray(o.items)?o.items:[]).forEach(it=>{
+      counted.forEach(o=> (Array.isArray(o.items)?o.items:[]).forEach(it=>{
         newArchive.byProduct[it.name] = (newArchive.byProduct[it.name]||0) + Number(it.qty||0);
       }));
       const byAssistant = JSON.parse(JSON.stringify(salesArchive.byAssistant||{}));
