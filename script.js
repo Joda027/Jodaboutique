@@ -9,10 +9,20 @@
     bague: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><circle cx="32" cy="38" r="14"/><path d="M26 24l6-10 6 10z" stroke-linejoin="round"/></svg>',
     sac: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="14" y="24" width="36" height="28" rx="3"/><path d="M22 24v-4a10 10 0 0120 0v4" stroke-linecap="round"/></svg>',
     foulard: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 18c8 6 8 14 0 20s0 14 8 20" stroke-linecap="round"/><path d="M52 18c-8 6-8 14 0 20s0 14-8 20" stroke-linecap="round"/></svg>',
+    montre: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><circle cx="32" cy="32" r="13"/><path d="M26 19l2-9h8l2 9M26 45l2 9h8l2-9M32 25v7l5 3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    lunette: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><circle cx="20" cy="36" r="9"/><circle cx="44" cy="36" r="9"/><path d="M29 35c2-2 4-2 6 0M11 34L8 22M53 34l3-12" stroke-linecap="round"/></svg>',
+    chaussure: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 44V22h12c2 6 8 10 16 12l14 3c4 1 6 4 6 7v2H8z" stroke-linejoin="round"/><path d="M8 50h48" stroke-linecap="round"/></svg>',
+    parfum: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="18" y="24" width="28" height="30" rx="4"/><path d="M26 24v-6h12v6M28 12h8v6h-8z" stroke-linejoin="round"/></svg>',
+    robe: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M24 8l2 10-6 10-8 26h40l-8-26-6-10 2-10M26 18h12" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+    vetement: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M24 10l-14 8 5 10 5-3v29h24V25l5 3 5-10-14-8c-1 4-4 6-8 6s-7-2-8-6z" stroke-linejoin="round"/></svg>',
+    chapeau: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 40c0-12 7-22 16-22s16 10 16 22M8 42c8 4 40 4 48 0" stroke-linecap="round"/></svg>',
+    promo: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="32" cy="32" r="22"/><path d="M24 40l16-16" stroke-linecap="round"/><circle cx="25" cy="25" r="3"/><circle cx="39" cy="39" r="3"/></svg>',
     autre: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M32 10l6 14 14 2-10 10 2 14-12-7-12 7 2-14-10-10 14-2z" stroke-linejoin="round"/></svg>'
   };
+  const ICON_ALIASES = {casquette:'chapeau', chemise:'vetement', habit:'vetement', 'vêtement':'vetement', pantalon:'vetement', basket:'chaussure', sandale:'chaussure', 'boucle':'boucles', 'écharpe':'foulard'};
   function iconFor(cat){
     const key = (cat||'').toLowerCase();
+    for(const a of Object.keys(ICON_ALIASES)){ if(key.includes(a)) return ICONS[ICON_ALIASES[a]]; }
     for(const k of Object.keys(ICONS)){ if(key.includes(k)) return ICONS[k]; }
     return ICONS.autre;
   }
@@ -41,7 +51,7 @@
   const baseTitle = document.title;
   let salesArchive = {count:0, revenue:0, byProduct:{}};
   let sessionLikes = {};
-  let openCategories = {};
+  let activeCat = '';
 
   const SUPABASE_URL = 'https://sfkxhelutkoqinmfceyc.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_HQc7xFR0jmCbFXXqhOFDhw_fjZ-x07V';
@@ -201,7 +211,7 @@
     renderSubscribeMini();
     renderCategoriesUI();
     renderStore();
-    renderCarousel(); renderHeroShowcase();
+    renderCarousel(); renderCategoryShowcase();
     renderPromoCountdown();
     renderDeliveryZoneOptions();
 
@@ -485,7 +495,24 @@
     }
     return items;
   }
+  // Blocs « Service client » et « WhatsApp » affichés en permanence dans l'en-tête.
+  function renderHeadContacts(){
+    const el = document.getElementById('headContacts');
+    const num = waNumber();
+    const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
+    let html = '';
+    if(phoneNum){
+      html += `<a class="head-item" href="tel:+${phoneNum}">
+        <span class="hi-icon">${CALL_ICON}</span><span class="hi-text">Service client<small>+${phoneNum}</small></span></a>`;
+    }
+    if(num){
+      html += `<a class="head-item wa" href="${waLink('Bonjour Joda Boutique, je souhaite commander.')}" target="_blank" rel="noopener">
+        <span class="hi-icon">${WA_ICON}</span><span class="hi-text">WhatsApp<small>Commander</small></span></a>`;
+    }
+    el.innerHTML = html;
+  }
   function renderContactBar(){
+    renderHeadContacts();
     const bar = document.getElementById('contactBar');
     const num = waNumber();
     const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
@@ -592,15 +619,16 @@
     const swatches = pVariants.length ? `<div class="color-swatches">
       ${pVariants.map(v=>`<button type="button" class="swatch ${v.id===activeVariant.id?'active':''} ${Number(v.stock)<=0?'oos':''}" data-swatch="${v.id}" data-swatch-product="${p.id}" title="${escapeHtml(v.color)}${Number(v.stock)<=0?' (épuisé)':''}">${escapeHtml(v.color)}</button>`).join('')}
     </div>` : '';
-    return `<div class="tag-card" id="prod-${p.id}" style="transform:rotate(${(i%2===0?-1:1)*1.4}deg)">
+    return `<div class="tag-card" id="prod-${p.id}">
       <button class="like-btn ${liked}" data-like="${p.id}" title="J'aime">♥${likeCount>0?`<span class="like-count">${likeCount}</span>`:''}</button>
       <button class="share-btn" data-share="${p.id}" title="Partager cette pièce">🔗</button>
+      ${promoActive() ? `<span class="card-promo">-${settings.promo_percent}%</span>` : ''}
       ${media}
+      <div class="cat">${escapeHtml(p.cat||'')}</div>
       <h3>${escapeHtml(p.name)}</h3>
-      <div class="cat">${escapeHtml(p.cat)}</div>
       ${swatches}
       <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
-      <div class="stock ${low?'low':''}">${outOfStock ? 'Épuisé' : stockNum + ' en stock'}</div>
+      <div class="stock ${low?'low':''} ${outOfStock?'out':''}">${outOfStock ? 'Épuisé' : stockNum + ' en stock'}</div>
       <button class="add" data-id="${p.id}" ${activeVariant?`data-variant-id="${activeVariant.id}"`:''} ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
     </div>`;
   }
@@ -673,8 +701,9 @@
       max: maxEl && maxEl.value !== '' ? Number(maxEl.value) : null
     };
   }
+  function catOf(p){ return (p.cat && p.cat.trim()) || 'Autre'; }
   function matchesSearch(p, s){
-    if(s.name && !String(p.name).toLowerCase().includes(s.name)) return false;
+    if(s.name && !String(p.name).toLowerCase().includes(s.name) && !catOf(p).toLowerCase().includes(s.name)) return false;
     const price = effectivePrice(p.price);
     if(s.min !== null && price < s.min) return false;
     if(s.max !== null && price > s.max) return false;
@@ -682,7 +711,7 @@
   }
   function groupByCategory(list){
     const map = {};
-    list.forEach(p=>{ const c = (p.cat && p.cat.trim()) || 'Autre'; (map[c] = map[c] || []).push(p); });
+    list.forEach(p=>{ const c = catOf(p); (map[c] = map[c] || []).push(p); });
     const toGroup = (name, items)=>{
       const withImg = items.find(p=>p.image);
       return {name, items, cover: withImg ? withImg.image : ''};
@@ -692,63 +721,102 @@
     Object.keys(map).sort((a,b)=>a.localeCompare(b,'fr')).forEach(c=> ordered.push(toGroup(c, map[c])));
     return ordered;
   }
+  function catCoverHtml(g){
+    return g.cover
+      ? `<img src="${g.cover}" alt="" loading="lazy">`
+      : `<span class="cat-icon">${iconFor(g.name)}</span>`;
+  }
+
+  // Menus de catégories (barre de navigation, colonne de gauche, onglets, liste déroulante).
+  function renderCategoryNav(groups){
+    const promo = promoActive();
+    const isActive = name => activeCat === name ? 'active' : '';
+    document.getElementById('catNavLinks').innerHTML =
+      `<button type="button" class="${isActive('')}" data-cat="">Accueil</button>`
+      + groups.map(g=>`<button type="button" class="${isActive(g.name)}" data-cat="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join('')
+      + (promo ? `<button type="button" class="promo-link ${isActive('__promo')}" data-cat="__promo"><span class="pct">%</span> Promotions</button>` : '');
+
+    document.getElementById('catSideList').innerHTML = groups.map(g=>`
+      <button type="button" class="cat-side-item ${isActive(g.name)}" data-cat="${escapeHtml(g.name)}">
+        <span class="csi-icon">${iconFor(g.name)}</span>
+        <span class="csi-name">${escapeHtml(g.name)}</span>
+        <span class="csi-count">${g.items.length}</span>
+      </button>`).join('')
+      + (promo ? `<button type="button" class="cat-side-item promo ${isActive('__promo')}" data-cat="__promo">
+        <span class="csi-icon">${ICONS.promo}</span><span class="csi-name">Promotions</span><span class="csi-count">-${settings.promo_percent}%</span>
+      </button>` : '');
+
+    document.getElementById('catTabs').innerHTML =
+      `<button type="button" class="${isActive('')}" data-cat="">Tous</button>`
+      + groups.map(g=>`<button type="button" class="${isActive(g.name)}" data-cat="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join('')
+      + (promo ? `<button type="button" class="promo-link ${isActive('__promo')}" data-cat="__promo">Promotions</button>` : '');
+
+    const sel = document.getElementById('searchCat');
+    sel.innerHTML = '<option value="">Toutes catégories</option>'
+      + groups.map(g=>`<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`).join('');
+    sel.value = activeCat === '__promo' ? '' : activeCat;
+  }
 
   function renderStore(){
     const grid = document.getElementById('productGrid');
     const visible = products.filter(isApproved);
     document.getElementById('heroStockCount').textContent = visible.reduce((s,p)=>s+Number(p.stock||0),0);
+    const groups = groupByCategory(visible);
+    if(activeCat && activeCat !== '__promo' && !groups.some(g=>g.name===activeCat)) activeCat = '';
+    if(activeCat === '__promo' && !promoActive()) activeCat = '';
+    renderCategoryNav(groups);
 
     const s = currentSearch();
     const searchActive = s.name !== '' || s.min !== null || s.max !== null;
     document.body.classList.toggle('searching', searchActive);
-    const filtered = visible.filter(p=> matchesSearch(p, s));
+    const filtered = visible.filter(p=> matchesSearch(p, s) && (!activeCat || activeCat === '__promo' || catOf(p) === activeCat));
 
+    const title = activeCat === '__promo' ? 'Promotions' : (activeCat || 'Nos produits phares');
+    document.querySelector('#productsSection .section-title').textContent = searchActive ? 'Résultats de recherche' : title;
     document.getElementById('productCountNote').textContent =
-      searchActive ? (filtered.length + ' résultat' + (filtered.length>1?'s':'')) : (visible.length + ' pièces disponibles');
+      (searchActive || activeCat) ? (filtered.length + ' pièce' + (filtered.length>1?'s':'')) : (visible.length + ' pièces disponibles');
 
     if(visible.length === 0){
       grid.innerHTML = '<div class="loading">Aucune pièce pour le moment. Ajoutez-en depuis l\'espace équipe.</div>';
       return;
     }
-
-    if(searchActive){
-      grid.innerHTML = filtered.length
-        ? `<div class="grid">${filtered.map((p,i)=>productCardHtml(p,i)).join('')}</div>`
-        : '<div class="loading">Aucun produit ne correspond à votre recherche.</div>';
-      wireStoreButtons(grid);
-      return;
-    }
-
-    const groups = groupByCategory(visible);
-    grid.innerHTML = groups.map(g=>{
-      const isOpen = !!openCategories[g.name];
-      const cover = g.cover
-        ? `<span class="cat-cover"><img src="${g.cover}" alt="" loading="lazy"></span>`
-        : `<span class="cat-cover cat-cover-icon">${iconFor(g.name)}</span>`;
-      return `<div class="cat-group ${isOpen?'open':''}">
-        <button class="cat-header" type="button" data-cat-toggle="${escapeHtml(g.name)}">
-          <span class="cat-head-left">${cover}<span class="cat-title">${escapeHtml(g.name)}</span></span>
-          <span class="cat-meta"><span class="cat-count">${g.items.length} pièce${g.items.length>1?'s':''}</span><span class="cat-chevron">▾</span></span>
-        </button>
-        <div class="cat-body"><div class="grid">${g.items.map((p,i)=>productCardHtml(p,i)).join('')}</div></div>
-      </div>`;
-    }).join('');
-    grid.querySelectorAll('[data-cat-toggle]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const name = btn.getAttribute('data-cat-toggle');
-        openCategories[name] = !openCategories[name];
-        btn.closest('.cat-group').classList.toggle('open', !!openCategories[name]);
-      });
-    });
+    grid.innerHTML = filtered.length
+      ? `<div class="grid">${filtered.map((p,i)=>productCardHtml(p,i)).join('')}</div>`
+      : '<div class="loading">Aucun produit ne correspond à votre recherche.</div>';
     wireStoreButtons(grid);
   }
 
-  // Ouvre la catégorie d'une pièce et fait défiler la collection jusqu'à elle.
+  function scrollToProducts(){
+    const el = document.getElementById('productsSection');
+    window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - document.querySelector('header.top').offsetHeight - 8, behavior:'smooth'});
+  }
+  function selectCategory(name){
+    activeCat = name || '';
+    document.getElementById('catSidebar').classList.remove('open');
+    document.getElementById('allCatsBtn').setAttribute('aria-expanded', 'false');
+    renderStore();
+    scrollToProducts();
+  }
+  // Tous les liens de catégorie (menus, cercles, bannières) passent par data-cat.
+  document.getElementById('storeView').parentElement.addEventListener('click', (e)=>{
+    const el = e.target.closest('[data-cat]');
+    if(!el) return;
+    if(document.getElementById('storeView').style.display === 'none') return;
+    selectCategory(el.getAttribute('data-cat'));
+  });
+  document.getElementById('allCatsBtn').addEventListener('click', ()=>{
+    const side = document.getElementById('catSidebar');
+    const open = side.classList.toggle('open');
+    document.getElementById('allCatsBtn').setAttribute('aria-expanded', String(open));
+    if(open) window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  // Ouvre la collection sur une pièce et fait défiler la page jusqu'à elle.
   function scrollToProduct(productId, variantId){
     const p = products.find(x=>x.id===productId);
     if(!p) return;
     if(variantId) selectedVariant[productId] = variantId;
-    openCategories[(p.cat && p.cat.trim()) || 'Autre'] = true;
+    activeCat = '';
     document.getElementById('searchName').value = '';
     document.getElementById('searchMin').value = '';
     document.getElementById('searchMax').value = '';
@@ -767,26 +835,73 @@
     const el = document.getElementById(id);
     if(el) el.addEventListener('input', renderStore);
   });
+  document.getElementById('searchCat').addEventListener('change', (e)=> selectCategory(e.target.value));
+  document.getElementById('searchForm').addEventListener('submit', (e)=>{
+    e.preventDefault();
+    renderStore();
+    scrollToProducts();
+  });
   document.getElementById('clearSearch').addEventListener('click', ()=>{
     document.getElementById('searchName').value = '';
     document.getElementById('searchMin').value = '';
     document.getElementById('searchMax').value = '';
+    activeCat = '';
     renderStore();
   });
+  document.getElementById('seeAll').addEventListener('click', ()=> selectCategory(''));
 
-  /* ---------- HERO SHOWCASE (défilement continu du catalogue) ---------- */
-  function renderHeroShowcase(){
-    const showcase = document.getElementById('heroShowcase');
-    const track = document.getElementById('hsTrack');
-    if(!showcase || !track) return;
-    const imgs = products.filter(p=> p.image && isApproved(p)).map(p=>p.image);
-    if(imgs.length === 0){ showcase.style.display = 'none'; return; }
-    showcase.style.display = '';
-    // liste dupliquée => boucle sans coupure (l'animation translate de -50%).
-    const html = imgs.map(src=>`<img class="hs-img" src="${src}" alt="" loading="lazy">`).join('');
-    track.innerHTML = html + html;
-    // vitesse proportionnelle au nombre d'images (rythme constant).
-    track.style.animationDuration = Math.max(18, imgs.length * 4) + 's';
+  /* ---------- VITRINE DES CATÉGORIES (colonne de droite, cercles, bannières, bandeau de confiance) ---------- */
+  function renderCategoryShowcase(){
+    const groups = groupByCategory(products.filter(isApproved));
+    const promo = promoActive();
+    const tones = ['navy','wine','ink'];
+    const card = (g, i, cls)=>`
+      <button type="button" class="${cls} tone-${tones[i%3]}" data-cat="${escapeHtml(g.name)}">
+        <span class="sp-text">
+          <span class="sp-name">${escapeHtml(g.name)}</span>
+          <span class="sp-sub">${g.items.length} pièce${g.items.length>1?'s':''} disponible${g.items.length>1?'s':''}</span>
+          <span class="sp-cta">Voir la collection →</span>
+        </span>
+        <span class="sp-img">${catCoverHtml(g)}</span>
+      </button>`;
+
+    const side = document.getElementById('sidePromos');
+    side.innerHTML = groups.slice(0,3).map((g,i)=>card(g,i,'side-promo')).join('');
+    side.style.display = groups.length ? '' : 'none';
+
+    document.getElementById('catCircles').innerHTML = groups.map(g=>`
+      <button type="button" class="cat-circle" data-cat="${escapeHtml(g.name)}">
+        <span class="cc-img">${catCoverHtml(g)}</span>
+        <span class="cc-name">${escapeHtml(g.name)}</span>
+      </button>`).join('')
+      + (promo ? `<button type="button" class="cat-circle promo" data-cat="__promo">
+        <span class="cc-img"><span class="cc-pct">%</span></span><span class="cc-name">Promotions</span>
+      </button>` : '');
+
+    // Bannières larges : les catégories suivantes (ou les premières s'il y en a peu).
+    const bannerGroups = groups.length > 3 ? groups.slice(3,6) : groups.slice(0,3);
+    document.getElementById('catBannersSection').style.display = bannerGroups.length && groups.length > 1 ? '' : 'none';
+    document.getElementById('catBanners').innerHTML = bannerGroups.map((g,i)=>card(g,i,'cat-banner')).join('');
+
+    renderTrustBar();
+  }
+  function renderTrustBar(){
+    const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
+    const wa = waNumber();
+    const om = (settings.orange_money||'').trim();
+    const contact = phoneNum ? '+'+phoneNum : (wa ? 'WhatsApp +'+wa : 'Par message');
+    const items = [
+      {icon:'<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', t:'Livraison à Conakry', s: deliveryActive() ? 'Selon votre quartier' : 'Confirmée par téléphone'},
+      {icon:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', t:'Paiement facile', s: om ? 'Orange Money accepté' : 'Confirmé avec l\'équipe'},
+      {icon:'<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" stroke-linejoin="round"/>', t:'Qualité garantie', s:'Pièces choisies à la main'},
+      {icon:'<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', t:'Service client', s: contact},
+      {icon:'<path d="M3 10l2-6h14l2 6M4 10v10h16V10M3 10h18M9 20v-6h6v6" stroke-linejoin="round"/>', t:'Notre boutique', s:'Conakry, Guinée'}
+    ];
+    document.getElementById('trustRow').innerHTML = items.map(it=>`
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${it.icon}</svg>
+        <div><div class="ti-title">${it.t}</div><div class="ti-sub">${escapeHtml(it.s)}</div></div>
+      </div>`).join('');
   }
 
   /* ---------- FEATURED CAROUSEL ---------- */
@@ -807,66 +922,87 @@
     });
     return items;
   }
+  const HERO_FEATURES = [
+    ['<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" stroke-linejoin="round"/>', 'Qualité<br>garantie'],
+    ['<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', 'Livraison<br>à Conakry'],
+    ['<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', 'Commande<br>rapide'],
+    ['<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', 'Service<br>client']
+  ];
+  function heroSlideHtml(item){
+    const catNames = groupByCategory(products.filter(isApproved)).slice(0,4).map(g=>escapeHtml(g.name)).join(' • ');
+    const features = HERO_FEATURES.map(([d,label])=>`<div class="hf"><span class="hf-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${d}</svg></span><span>${label}</span></div>`).join('');
+    const priceHtml = item ? (promoActive()
+      ? `<span class="hs-price">${effectivePrice(item.price).toLocaleString('fr-FR')} GNF</span><span class="hs-old">${Number(item.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span>`
+      : `<span class="hs-price">${Number(item.price).toLocaleString('fr-FR')} GNF</span>`) : '';
+    return `
+      <div class="car-slide" ${item ? `data-pid="${item.id}" data-vid="${item.variantId||''}"` : ''}>
+        <div class="hs-copy">
+          <div class="hs-eyebrow">${promoActive() ? `Promotion -${settings.promo_percent}%` : 'Nouvelle collection'}</div>
+          <div class="hs-title">Joda<br><span>Boutique</span></div>
+          ${catNames ? `<div class="hs-cats">${catNames}</div>` : ''}
+          <div class="hs-script">L'excellence dans la qualité</div>
+          <div class="hs-features">${features}</div>
+          <button type="button" class="hs-cta">${item ? 'Découvrir cette pièce' : 'Découvrir maintenant'} <span>→</span></button>
+        </div>
+        <div class="hs-visual">
+          ${item ? `<img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy">
+          <div class="hs-tag"><div class="hs-name">${escapeHtml(item.name)}${item.color ? ' — '+escapeHtml(item.color) : ''}</div>${priceHtml}</div>`
+          : `<img class="hs-logo" src="${LOGO_SRC}" alt="Joda Boutique">`}
+        </div>
+      </div>`;
+  }
   function renderCarousel(){
-    const section = document.getElementById('carouselSection');
     const track = document.getElementById('carouselTrack');
     const dots = document.getElementById('carouselDots');
     carouselItems = buildCarouselItems();
     if(carouselTimer){ clearInterval(carouselTimer); carouselTimer = null; }
-    if(carouselItems.length === 0){ section.style.display = 'none'; return; }
-    section.style.display = '';
-    track.innerHTML = carouselItems.map(item=>{
-      const cp = promoActive()
-        ? `${effectivePrice(item.price).toLocaleString('fr-FR')} GNF<div class="cp-old-row"><span class="cp-old">${Number(item.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span></div>`
-        : `${Number(item.price).toLocaleString('fr-FR')} GNF`;
-      return `
-      <div class="car-slide" data-pid="${item.id}" data-vid="${item.variantId||''}" title="Voir dans la collection">
-        <img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy">
-        <div class="car-caption">
-          <div class="cn">${escapeHtml(item.name)}${item.color ? ' — '+escapeHtml(item.color) : ''}</div>
-          <div class="cp">${cp}</div>
-        </div>
-      </div>`;
-    }).join('');
-    dots.innerHTML = carouselItems.map((item,i)=>`<button class="car-dot ${i===0?'active':''}" data-i="${i}"></button>`).join('');
+    track.innerHTML = carouselItems.length ? carouselItems.map(heroSlideHtml).join('') : heroSlideHtml(null);
+    const multi = carouselItems.length > 1;
+    document.getElementById('carPrev').style.display = multi ? '' : 'none';
+    document.getElementById('carNext').style.display = multi ? '' : 'none';
+    dots.innerHTML = multi ? carouselItems.slice(0, 12).map((item,i)=>`<button class="car-dot ${i===0?'active':''}" data-i="${i}" aria-label="Diapositive ${i+1}"></button>`).join('') : '';
     dots.querySelectorAll('.car-dot').forEach(d=>{
       d.addEventListener('click', ()=> goToSlide(Number(d.dataset.i)));
     });
-    track.querySelectorAll('.car-slide[data-pid]').forEach(slide=>{
-      slide.addEventListener('click', ()=> scrollToProduct(slide.dataset.pid, slide.dataset.vid || null));
+    track.querySelectorAll('.car-slide').forEach(slide=>{
+      slide.addEventListener('click', ()=>{
+        if(slide.dataset.pid) scrollToProduct(slide.dataset.pid, slide.dataset.vid || null);
+        else scrollToProducts();
+      });
     });
-    if(carouselItems.length > 1){
+    if(multi){
       carouselTimer = setInterval(()=>{
         const cur = currentSlideIndex();
         goToSlide((cur + 1) % carouselItems.length);
-      }, 4200);
+      }, 5000);
     }
   }
   function currentSlideIndex(){
     const track = document.getElementById('carouselTrack');
-    const slides = track.querySelectorAll('.car-slide');
-    if(!slides.length) return 0;
-    const slideWidth = slides[0].offsetWidth + 20;
-    return Math.round(track.scrollLeft / slideWidth);
+    if(!track.clientWidth) return 0;
+    return Math.round(track.scrollLeft / track.clientWidth);
   }
   function goToSlide(i){
     const track = document.getElementById('carouselTrack');
-    const slides = track.querySelectorAll('.car-slide');
-    if(!slides.length) return;
-    const slideWidth = slides[0].offsetWidth + 20;
-    track.scrollTo({left: i * slideWidth, behavior:'smooth'});
+    if(!track.children.length) return;
+    track.scrollTo({left: i * track.clientWidth, behavior:'smooth'});
     document.querySelectorAll('.car-dot').forEach((d,idx)=>d.classList.toggle('active', idx===i));
   }
   document.getElementById('carPrev').addEventListener('click', ()=>{
-    goToSlide(Math.max(0, currentSlideIndex()-1));
+    const cur = currentSlideIndex();
+    goToSlide(cur > 0 ? cur-1 : carouselItems.length-1);
   });
   document.getElementById('carNext').addEventListener('click', ()=>{
-    goToSlide(Math.min(carouselItems.length-1, currentSlideIndex()+1));
+    goToSlide((currentSlideIndex()+1) % carouselItems.length);
   });
-  document.getElementById('carouselTrack').addEventListener('mouseenter', ()=>{ if(carouselTimer){ clearInterval(carouselTimer); carouselTimer=null; } });
-  document.getElementById('carouselTrack').addEventListener('mouseleave', ()=>{
+  document.getElementById('carouselTrack').addEventListener('scroll', ()=>{
+    const i = currentSlideIndex();
+    document.querySelectorAll('.car-dot').forEach((d,idx)=>d.classList.toggle('active', idx===i));
+  }, {passive:true});
+  document.getElementById('carouselSection').addEventListener('mouseenter', ()=>{ if(carouselTimer){ clearInterval(carouselTimer); carouselTimer=null; } });
+  document.getElementById('carouselSection').addEventListener('mouseleave', ()=>{
     if(carouselItems.length > 1 && !carouselTimer){
-      carouselTimer = setInterval(()=>{ goToSlide((currentSlideIndex()+1) % carouselItems.length); }, 4200);
+      carouselTimer = setInterval(()=>{ goToSlide((currentSlideIndex()+1) % carouselItems.length); }, 5000);
     }
   });
 
@@ -963,7 +1099,6 @@
   document.getElementById('openCart').addEventListener('click', openDrawer);
   document.getElementById('closeCart').addEventListener('click', closeDrawer);
   document.getElementById('overlay').addEventListener('click', closeDrawer);
-  document.getElementById('heroShop').addEventListener('click', ()=>{ window.scrollTo({top: document.getElementById('productGrid').offsetTop - 100, behavior:'smooth'}); });
 
   document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
     const keys = Object.keys(cart).filter(k=>cart[k]>0);
@@ -989,7 +1124,7 @@
     }
     await Promise.all([loadProducts(), loadVariants()]);
     cart = {};
-    renderCart(); renderStore(); renderCarousel(); renderHeroShowcase();
+    renderCart(); renderStore(); renderCarousel(); renderCategoryShowcase();
     if(currentUser){ await loadOrders(); renderLoggedArea(); }
     notifyTeam('new_order', data.id);
 
@@ -1028,6 +1163,7 @@
   /* ---------- NAV / VIEWS ---------- */
   function setView(view){
     document.getElementById('storeView').style.display = view==='store' ? '' : 'none';
+    document.body.classList.toggle('view-admin', view==='admin');
     document.getElementById('adminView').style.display = view==='admin' ? '' : 'none';
     document.querySelectorAll('.navbtn[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
     if(view==='admin'){
@@ -1911,7 +2047,7 @@ Données des 7 derniers jours :
           expandedVariantIds.add(pid);
         }
         await Promise.all([loadProducts(), loadVariants()]);
-        renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
+        renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase();
       });
     });
     body.querySelectorAll('button[data-act]').forEach(btn=>{
@@ -1979,14 +2115,14 @@ Données des 7 derniers jours :
               await sb.from('products').update({image}).eq('id', p.id);
               await logActivity(currentUser.name, 'a ajouté une photo pour "'+p.name+'"');
               await loadProducts();
-              renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
+              renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase();
             }catch(e){ alert("La photo n'a pas pu être chargée."); }
           };
           input.click();
           return;
         }
         await loadProducts();
-        renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase(); if(currentUser.role==='admin') renderOverview();
+        renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase(); if(currentUser.role==='admin') renderOverview();
       });
     });
   }
@@ -2025,7 +2161,7 @@ Données des 7 derniers jours :
     msg.textContent = isAdminAdd ? '"'+name+'" ajouté et publié.' : '"'+name+'" envoyé pour approbation. Il sera visible des clients après validation de l\'administratrice.';
     setTimeout(()=>msg.textContent='',4000);
     await loadProducts();
-    renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase(); if(currentUser.role==='admin') renderOverview();
+    renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase(); if(currentUser.role==='admin') renderOverview();
   });
 
   let expandedOrderIds = new Set();
@@ -2351,7 +2487,7 @@ Données des 7 derniers jours :
     await loadSettings();
     await logActivity(currentUser.name, active ? `a activé une promotion de ${percent}%` : 'a désactivé la promotion');
     msg.textContent = 'Promotion mise à jour.';
-    renderStore(); renderCarousel(); renderHeroShowcase(); renderCart(); renderPromoCountdown();
+    renderStore(); renderCarousel(); renderCategoryShowcase(); renderCart(); renderPromoCountdown();
     setTimeout(()=>msg.textContent='',2000);
   });
 
@@ -2377,7 +2513,7 @@ Données des 7 derniers jours :
     msg.textContent = `Conversion de ${legacyCount} photo(s) en cours…`;
     const { done, total } = await migrateLegacyImagesToStorage();
     await loadProducts();
-    renderProductsTab(); renderStore(); renderCarousel(); renderHeroShowcase();
+    renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase();
     btn.disabled = false;
     msg.textContent = done===total ? `${done} photo(s) converties avec succès.` : `${done} sur ${total} converties — réessayez pour les autres (vérifiez votre connexion).`;
   });

@@ -24,7 +24,7 @@
 <link rel="apple-touch-icon" href="logo.webp">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script type="application/ld+json">
 {
@@ -46,71 +46,101 @@
 
 <header class="top">
   <div class="wrap navrow">
-    <div class="brand">
+    <div class="brand" data-view="store" role="button" tabindex="0">
       <img class="brand-logo" alt="Joda Boutique">
       <div class="brand-text">Joda Boutique<small>L'EXCELLENCE DANS LA QUALITÉ</small></div>
     </div>
+    <form class="search-bar store-only" id="searchForm" role="search">
+      <input id="searchName" type="search" placeholder="Rechercher un produit, une catégorie…" autocomplete="off">
+      <select id="searchCat" aria-label="Catégorie">
+        <option value="">Toutes catégories</option>
+      </select>
+      <button type="submit" class="search-go" aria-label="Rechercher">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4" stroke-linecap="round"/></svg>
+      </button>
+    </form>
     <nav class="links">
-      <button class="navbtn" data-view="store">Boutique</button>
-      <button class="navbtn" data-view="admin">Espace équipe</button>
-      <div class="contact-bar" id="contactBar" style="display:none;"></div>
-      <button class="cart-btn" id="openCart">Panier <span class="cart-count" id="cartCount">0</span></button>
+      <div class="head-contacts store-only" id="headContacts"></div>
+      <button class="head-item navbtn" data-view="admin" type="button">
+        <svg class="hi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" stroke-linecap="round"/></svg>
+        <span class="hi-text">Espace équipe<small>Connexion</small></span>
+      </button>
+      <button class="cart-btn" id="openCart" type="button" aria-label="Panier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h2l2.4 11.2a2 2 0 002 1.6h7.7a2 2 0 001.9-1.5L21 8H6.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>
+        <span class="cart-label">Panier</span>
+        <span class="cart-count" id="cartCount">0</span>
+      </button>
     </nav>
+  </div>
+  <div class="catnav store-only">
+    <div class="wrap catnav-row">
+      <button class="allcats-btn" id="allCatsBtn" type="button" aria-expanded="false">
+        <span class="burger"><i></i><i></i><i></i></span> Toutes les catégories <span class="chev">▾</span>
+      </button>
+      <div class="catnav-links" id="catNavLinks"></div>
+      <div class="catnav-right">
+        <div class="contact-bar" id="contactBar" style="display:none;"></div>
+        <button type="button" class="subscribe-mini" id="subscribeMini" style="display:none;">🔔 S'abonner</button>
+      </div>
+    </div>
   </div>
 </header>
 
 <main id="storeView">
-  <div class="search-top">
-    <div class="wrap">
-      <div class="collection-filters">
-        <input class="text-input" id="searchName" placeholder="Rechercher un produit par nom…">
-        <input class="text-input" id="searchMin" type="number" min="0" placeholder="Prix min (GNF)">
-        <input class="text-input" id="searchMax" type="number" min="0" placeholder="Prix max (GNF)">
-        <button class="btn-ghost" id="clearSearch" type="button">Effacer</button>
-      </div>
-    </div>
-  </div>
-  <section class="hero">
-    <div class="wrap hero-grid">
-      <div>
-        <div class="eyebrow">Bijoux &amp; accessoires — Conakry</div>
-        <h1 class="hero-title">Des pièces qui se <em>portent</em>,<br>pas seulement qui se vendent.</h1>
-        <p class="hero-sub">Chaque bijou de Joda Boutique est choisi à la main. Parcourez la collection, ajoutez vos coups de cœur au panier, et passez commande en quelques secondes.</p>
-        <div class="hero-cta">
-          <button class="btn-primary" id="heroShop">Voir la collection</button>
-        </div>
-        <div class="hero-stockline"><span id="heroStockCount">—</span> pièces en stock</div>
-      </div>
-      <div class="hero-showcase" id="heroShowcase" style="display:none;">
-        <div class="hs-track" id="hsTrack"></div>
-      </div>
-    </div>
-  </section>
+  <section class="home-top">
+    <div class="wrap home-grid">
+      <aside class="cat-sidebar" id="catSidebar">
+        <div class="cat-side-list" id="catSideList"></div>
+        <div class="cat-side-foot"><span id="heroStockCount">—</span> pièces en stock</div>
+      </aside>
 
-  <section class="carousel-section" id="carouselSection" style="display:none;">
-    <div class="wrap">
-      <div class="featured-head">
-        <div class="section-note">En vedette en ce moment</div>
-        <button type="button" class="subscribe-mini" id="subscribeMini" style="display:none;">🔔 S'abonner</button>
-      </div>
-      <div class="carousel-wrap">
-        <button class="car-arrow" id="carPrev">‹</button>
+      <div class="hero-slider" id="carouselSection">
         <div class="carousel-track" id="carouselTrack"></div>
-        <button class="car-arrow" id="carNext">›</button>
+        <button class="car-arrow prev" id="carPrev" type="button" aria-label="Précédent">‹</button>
+        <button class="car-arrow next" id="carNext" type="button" aria-label="Suivant">›</button>
+        <div class="carousel-dots" id="carouselDots"></div>
       </div>
-      <div class="carousel-dots" id="carouselDots"></div>
+
+      <div class="side-promos" id="sidePromos"></div>
     </div>
   </section>
 
-  <div class="wrap">
-    <div class="section-head">
-      <h2 class="section-title">La collection</h2>
-      <div class="section-note" id="productCountNote">chargement…</div>
+  <section class="cat-circles-section">
+    <div class="wrap">
+      <div class="cat-circles" id="catCircles"></div>
     </div>
-    <div id="productGrid">
-      <div class="loading">Chargement de la collection…</div>
+  </section>
+
+  <section class="cat-banners-section" id="catBannersSection" style="display:none;">
+    <div class="wrap">
+      <div class="cat-banners" id="catBanners"></div>
     </div>
-  </div>
+  </section>
+
+  <section class="products-section" id="productsSection">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 class="section-title">Nos produits phares</h2>
+        <div class="cat-tabs" id="catTabs"></div>
+        <button type="button" class="see-all" id="seeAll">Voir tout →</button>
+      </div>
+      <div class="products-toolbar">
+        <div class="section-note" id="productCountNote">chargement…</div>
+        <div class="price-filters">
+          <input class="text-input" id="searchMin" type="number" min="0" placeholder="Prix min (GNF)">
+          <input class="text-input" id="searchMax" type="number" min="0" placeholder="Prix max (GNF)">
+          <button class="btn-ghost" id="clearSearch" type="button">Effacer</button>
+        </div>
+      </div>
+      <div id="productGrid">
+        <div class="loading">Chargement de la collection…</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="trust-bar">
+    <div class="wrap trust-row" id="trustRow"></div>
+  </section>
 </main>
 
 <!-- ADMIN VIEW -->
