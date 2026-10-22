@@ -144,6 +144,8 @@ create table if not exists sales_archive (
   revenue numeric not null default 0,
   by_product jsonb not null default '{}'::jsonb
 );
+-- Ventes traitées archivées par assistante : { "<team_member id>": {"count": n, "sales": montant} }
+alter table sales_archive add column if not exists by_assistant jsonb not null default '{}'::jsonb;
 insert into sales_archive (id) values (true) on conflict (id) do nothing;
 
 -- Abonnés aux notifications push (navigateur)

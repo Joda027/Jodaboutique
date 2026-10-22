@@ -49,7 +49,7 @@
   let deliveryZones = [];
   let ordersRealtimeChannel = null;
   const baseTitle = document.title;
-  let salesArchive = {count:0, revenue:0, byProduct:{}};
+  let salesArchive = {count:0, revenue:0, byProduct:{}, byAssistant:{}};
   let sessionLikes = {};
   let activeCat = '';
 
@@ -226,10 +226,12 @@
     return Math.round(Number(price) * (1 - Number(settings.promo_percent)/100));
   }
   async function loadSalesArchive(){
-    if(!currentUser || currentUser.role!=='admin'){ salesArchive = {count:0, revenue:0, byProduct:{}}; return; }
-    const { data, error } = await sb.from('sales_archive').select('count,revenue,by_product').eq('id', true).maybeSingle();
+    salesArchive = {count:0, revenue:0, byProduct:{}, byAssistant:{}};
+    if(!currentUser || currentUser.role!=='admin') return;
+    let { data, error } = await sb.from('sales_archive').select('count,revenue,by_product,by_assistant').eq('id', true).maybeSingle();
+    if(error) ({ data, error } = await sb.from('sales_archive').select('count,revenue,by_product').eq('id', true).maybeSingle());
     if(error) console.error('loadSalesArchive', error);
-    salesArchive = data ? {count:data.count||0, revenue:data.revenue||0, byProduct:data.by_product||{}} : {count:0, revenue:0, byProduct:{}};
+    if(data) salesArchive = {count:data.count||0, revenue:data.revenue||0, byProduct:data.by_product||{}, byAssistant:data.by_assistant||{}};
   }
 
   async function loadAll(){
@@ -1835,7 +1837,64 @@ Données du mois (${monthLabel(now)}) pour ${currentUser.name} :
   document.getElementById('myWeekPrevBtn').addEventListener('click', ()=>{ myWeekOffset--; renderMyWeekPanel(); });
   document.getElementById('myWeekNextBtn').addEventListener('click', ()=>{ if(myWeekOffset<0){ myWeekOffset++; renderMyWeekPanel(); } });
 
+  // Cumul « depuis toujours » : commandes en base + ventes hors site + résumé archivé.
+  function renderCumulPanel(){
+    const live = orders.filter(o=>o.ts && o.status!=='annulée');
+    const arch = salesArchive || {count:0, revenue:0, byAssistant:{}};
+    const assistants = team.filter(t=>t.role==='assistant');
+    const assistantRows = assistants.map(a=>{
+      const treated = assistantOrders(a.id, o=>o.status==='traitée');
+      const ar = (arch.byAssistant||{})[a.id] || {count:0, sales:0};
+      const count = treated.length + Number(ar.count||0);
+      const sales = treated.reduce((s,o)=>s+Number(o.total||0),0) + Number(ar.sales||0);
+      const com = Math.round(sales*COMMISSION_RATE);
+      return {name:a.name, count, sales, com, net: sales-com};
+    });
+    const sales = live.reduce((s,o)=>s+Number(o.total||0),0) + offlineSales.reduce((s,o)=>s+Number(o.amount||0),0) + Number(arch.revenue||0);
+    const exp = expenses.reduce((s,e)=>s+Number(e.amount||0),0);
+    const com = assistantRows.reduce((s,r)=>s+r.com,0);
+    const net = sales - exp - com;
+    const firstTs = Math.min(...[...live.map(o=>o.ts), ...offlineSales.map(o=>o.ts), ...expenses.map(e=>e.ts)]
+      .map(t=>new Date(t).getTime()).filter(t=>!isNaN(t)), Date.now());
+    document.getElementById('cumulSince').textContent = 'Depuis le ' + new Date(firstTs).toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'})
+      + (arch.count ? ` · inclut ${arch.count} commande${arch.count>1?'s':''} archivée${arch.count>1?'s':''} (réinitialisation)` : '');
+    document.getElementById('cumulGrid').innerHTML = `
+      <div class="stat-card"><div class="num">${sales.toLocaleString('fr-FR')}</div><div class="lbl">Ventes totales (GNF)</div></div>
+      <div class="stat-card"><div class="num">${exp.toLocaleString('fr-FR')}</div><div class="lbl">Dépenses totales (GNF)</div></div>
+      <div class="stat-card"><div class="num">${com.toLocaleString('fr-FR')}</div><div class="lbl">Commissions totales (GNF)</div></div>
+      <div class="stat-card net-highlight"><div class="num">${net.toLocaleString('fr-FR')}</div><div class="lbl">Résultat net cumulé (GNF)</div></div>
+      <div class="stat-card"><div class="num">${(live.length + Number(arch.count||0)).toLocaleString('fr-FR')}</div><div class="lbl">Commandes au total</div></div>
+    `;
+
+    // Mois par mois, du plus ancien au plus récent, avec le net cumulé qui s'additionne.
+    const months = new Set([...live.map(o=>monthKey(o.ts)), ...offlineSales.map(o=>monthKey(o.ts)), ...expenses.map(e=>monthKey(e.ts))]);
+    let running = 0;
+    let rowsHtml = '';
+    const archSales = Number(arch.revenue||0);
+    const archCom = Object.values(arch.byAssistant||{}).reduce((s,a)=>s+Math.round(Number(a.sales||0)*COMMISSION_RATE),0);
+    if(archSales || archCom){
+      running = archSales - archCom;
+      rowsHtml += `<tr class="cumul-row-archive"><td>Avant réinitialisation</td><td>${money(archSales)}</td><td>—</td><td>${money(archCom)}</td><td>${money(running)}</td><td><strong>${money(running)}</strong></td></tr>`;
+    }
+    rowsHtml += [...months].sort().map(mk=>{
+      const [y,m] = mk.split('-').map(Number);
+      const f = monthFinancials(new Date(y, m-1, 15).getTime());
+      const mCom = assistants.reduce((s,a)=>s+commissionOf(assistantOrders(a.id, o=>o.ts && monthKey(o.ts)===mk)),0);
+      const mNet = f.revenue - f.totalExp - mCom;
+      running += mNet;
+      return `<tr><td>${monthLabel(new Date(y, m-1, 15))}</td><td>${money(f.revenue)}</td><td>${money(f.totalExp)}</td><td>${money(mCom)}</td>
+        <td>${money(mNet)}</td><td style="color:${running<0?'var(--red)':'#1B7A3D'};font-weight:700;">${money(running)}</td></tr>`;
+    }).join('');
+    document.getElementById('cumulMonthsBody').innerHTML = rowsHtml || '<tr><td colspan="6">Aucune vente ni dépense pour l\'instant.</td></tr>';
+
+    document.getElementById('cumulAssistantsBody').innerHTML = assistantRows.map(r=>`
+      <tr><td>${escapeHtml(r.name)}</td><td>${r.count}</td><td>${money(r.sales)}</td>
+        <td style="color:#1B7A3D;font-weight:600;">${money(r.com)}</td><td style="color:var(--wine);font-weight:600;">${money(r.net)}</td></tr>`).join('')
+      || '<tr><td colspan="5">Aucune assistante.</td></tr>';
+  }
+
   function renderFinancesTab(){
+    renderCumulPanel();
     const f = monthFinancials(Date.now());
     const mk = monthKey(Date.now());
     const assistantsList = team.filter(t=>t.role==='assistant');
@@ -2687,8 +2746,18 @@ Données des 7 derniers jours :
       orders.forEach(o=> (Array.isArray(o.items)?o.items:[]).forEach(it=>{
         newArchive.byProduct[it.name] = (newArchive.byProduct[it.name]||0) + Number(it.qty||0);
       }));
-      const { error: aErr } = await sb.from('sales_archive')
-        .update({count:newArchive.count, revenue:newArchive.revenue, by_product:newArchive.byProduct}).eq('id', true);
+      const byAssistant = JSON.parse(JSON.stringify(salesArchive.byAssistant||{}));
+      orders.filter(o=>o.status==='traitée' && o.claimedBy).forEach(o=>{
+        const a = byAssistant[o.claimedBy] = byAssistant[o.claimedBy] || {count:0, sales:0};
+        a.count += 1; a.sales += Number(o.total||0);
+      });
+      let { error: aErr } = await sb.from('sales_archive')
+        .update({count:newArchive.count, revenue:newArchive.revenue, by_product:newArchive.byProduct, by_assistant:byAssistant}).eq('id', true);
+      if(aErr && /by_assistant/.test(aErr.message||'')){
+        // Base pas encore migrée (2026-10-22-cumul.sql) : on archive sans le détail par assistante.
+        ({ error: aErr } = await sb.from('sales_archive')
+          .update({count:newArchive.count, revenue:newArchive.revenue, by_product:newArchive.byProduct}).eq('id', true));
+      }
       if(aErr){ msg.textContent = "Erreur (sauvegarde du résumé) : " + aErr.message; return; }
       const { error: dErr } = await sb.from('orders').delete().gte('ts', 0);
       if(dErr){ msg.textContent = "Erreur (suppression des commandes) : " + dErr.message; return; }
