@@ -938,11 +938,11 @@
       <div class="car-slide" ${item ? `data-pid="${item.id}" data-vid="${item.variantId||''}"` : ''}>
         <div class="hs-copy">
           <div class="hs-eyebrow">${promoActive() ? `Promotion -${settings.promo_percent}%` : 'Nouvelle collection'}</div>
-          <div class="hs-title">Joda<br><span>Boutique</span></div>
+          <div class="hs-title">Joda <br><span>Boutique</span></div>
           ${catNames ? `<div class="hs-cats">${catNames}</div>` : ''}
           <div class="hs-script">L'excellence dans la qualité</div>
           <div class="hs-features">${features}</div>
-          <button type="button" class="hs-cta">${item ? 'Découvrir cette pièce' : 'Découvrir maintenant'} <span>→</span></button>
+          <button type="button" class="hs-cta">${item ? 'Voir la pièce' : 'Découvrir'} <span>→</span></button>
         </div>
         <div class="hs-visual">
           ${item ? `<img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy">
