@@ -713,7 +713,7 @@
     let pays = '';
     if(settings.online_payment) pays += `<div class="f-pay-item">${omLogo}<div>Paiement en ligne<small>Orange Money, validé sur votre téléphone</small></div></div>`;
     if(omNumber()) pays += `<div class="f-pay-item">${omLogo}<div>Transfert Orange Money<small>Au numéro de la boutique</small></div></div>`;
-    pays += `<div class="f-pay-item">${document.querySelector('.pay-opt[data-pay="livraison"] .cash-logo').outerHTML}<div>À la livraison<small>En espèces à la réception</small></div></div>`;
+    pays += `<div class="f-pay-item">${document.querySelector('.pay-opt[data-pay="livraison"] .cash-logo').outerHTML}<div>À la livraison<small>Selon disponibilité</small></div></div>`;
     document.getElementById('footPayments').innerHTML = pays;
   }
   function renderContactBar(){
@@ -1098,7 +1098,7 @@
     const contact = phoneNum ? '+'+phoneNum : (wa ? 'WhatsApp +'+wa : 'Par message');
     const items = [
       {icon:'<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>', t:'Livraison partout en Guinée', s: deliveryActive() ? 'Selon votre quartier' : 'Confirmée par téléphone'},
-      {icon:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', t:'Paiement à la livraison', s: om ? 'ou par Orange Money' : 'En espèces à la réception'},
+      {icon:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', t:'Paiement facile', s: om ? 'Orange Money accepté' : 'Confirmé avec l\'équipe'},
       {icon:'<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z" stroke-linejoin="round"/>', t:'Qualité garantie', s:'Pièces choisies à la main'},
       {icon:'<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', t:'Service client', s: contact},
       {icon:'<path d="M3 10l2-6h14l2 6M4 10v10h16V10M3 10h18M9 20v-6h6v6" stroke-linejoin="round"/>', t:'Notre boutique', s:'Conakry, Guinée'}
@@ -1144,8 +1144,7 @@
         <div class="hs-copy">
           <div class="hs-eyebrow">${promoActive() ? `Promotion -${settings.promo_percent}%` : 'Nouvelle collection'}</div>
           <div class="hs-title">Joda <br><span>Boutique</span></div>
-          <div class="hs-lead">Bijoux, sacs et accessoires tendance à Conakry, livrés chez vous.</div>
-          <div class="hs-cod">💵 Paiement à la livraison</div>
+          <div class="hs-lead">Bijoux, sacs et accessoires tendance à Conakry, livrés partout en Guinée.</div>
           <div class="hs-script">L'excellence dans la qualité</div>
           <div class="hs-features">${features}</div>
           <button type="button" class="hs-cta">${item ? 'Voir la pièce' : 'Découvrir'} <span>→</span></button>
