@@ -135,8 +135,12 @@
   }
   async function loadSettings(){
     const cols = 'whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories';
-    let { data, error } = await sb.from('settings').select(cols + ',online_payment').eq('id', true).maybeSingle();
-    if(error) ({ data, error } = await sb.from('settings').select(cols).eq('id', true).maybeSingle());
+    // Colonnes ajoutées par les migrations : on retombe sur moins de colonnes si l'une manque.
+    let data = null, error = null;
+    for(const extra of [',online_payment,share_image', ',online_payment', '']){
+      ({ data, error } = await sb.from('settings').select(cols + extra).eq('id', true).maybeSingle());
+      if(!error) break;
+    }
     if(error) console.error('loadSettings', error);
     settings = data || {whatsapp:'', phone:'', facebook:'', orange_money:'', promo_active:false, promo_percent:0, promo_ends_at:null, delivery_enabled:false, delivery_zones:[], categories:[]};
     categories = Array.isArray(settings.categories) ? settings.categories : [];
@@ -269,6 +273,7 @@
     renderCarousel(); renderCategoryShowcase();
     renderPromoCountdown();
     renderDeliveryZoneOptions();
+    loadReviews().then(renderReviews);
     renderPaymentOptions();
 
     handlePaymentReturn();
@@ -311,11 +316,99 @@
   }
   document.getElementById('payReturnClose').addEventListener('click', ()=>{ document.getElementById('payReturn').style.display = 'none'; });
 
+  /* ---------- AVIS DE CLIENTES ---------- */
+  let reviews = [];
+  async function loadReviews(){
+    const { data, error } = await sb.from('reviews').select('id,customer,message,rating,photo,published,created_at').order('created_at', {ascending:false});
+    reviews = error ? [] : (data || []);  // table absente tant que la migration n'est pas faite
+  }
+  function starsHtml(n){ const k = Math.max(1, Math.min(5, Number(n)||5)); return '★'.repeat(k) + '☆'.repeat(5-k); }
+  function renderReviews(){
+    const visible = reviews.filter(r=>r.published);
+    document.getElementById('reviewsSection').style.display = visible.length ? '' : 'none';
+    const row = document.getElementById('reviewsRow');
+    row.innerHTML = visible.slice(0, 8).map(r=>`
+      <div class="review-card">
+        ${r.photo ? `<img src="${escapeHtml(r.photo)}" alt="Avis de ${escapeHtml(r.customer)}" loading="lazy">` : ''}
+        <div class="review-body">
+          <div class="review-stars" aria-label="${Number(r.rating)} sur 5">${starsHtml(r.rating)}</div>
+          <div class="review-text">« ${escapeHtml(r.message)} »</div>
+          <div class="review-name">— ${escapeHtml(r.customer)}</div>
+        </div>
+      </div>`).join('');
+    row.querySelectorAll('img').forEach(img=> img.addEventListener('click', ()=> openLightbox(img.src, img.alt)));
+  }
+  function renderReviewsAdmin(){
+    const list = document.getElementById('reviewsAdminList');
+    if(!list) return;
+    list.innerHTML = reviews.map(r=>`
+      <div class="review-admin-row">
+        ${r.photo ? `<img src="${escapeHtml(r.photo)}" alt="">` : ''}
+        <span class="ra-text"><strong>${escapeHtml(r.customer)}</strong> — ${escapeHtml(r.message)}</span>
+        <button class="btn-mini danger" data-del-review="${r.id}">Retirer</button>
+      </div>`).join('') || '<div class="section-note">Aucun avis pour le moment.</div>';
+    list.querySelectorAll('[data-del-review]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      if(!confirm('Retirer cet avis de la boutique ?')) return;
+      const { error } = await sb.from('reviews').delete().eq('id', btn.dataset.delReview);
+      if(error){ alert('Erreur : '+error.message); return; }
+      await loadReviews(); renderReviews(); renderReviewsAdmin();
+    }));
+  }
+  document.getElementById('addReviewBtn').addEventListener('click', async ()=>{
+    const msg = document.getElementById('reviewMsg');
+    const customer = document.getElementById('revName').value.trim();
+    const message = document.getElementById('revMessage').value.trim();
+    const rating = Number(document.getElementById('revRating').value) || 5;
+    const file = document.getElementById('revPhoto').files[0];
+    if(!customer || !message){ msg.textContent = 'Indiquez le prénom et le message de la cliente.'; return; }
+    msg.textContent = 'Enregistrement…';
+    let photo = null;
+    try{ if(file) photo = await uploadProductPhoto(file, 'avis'); }
+    catch(e){ msg.textContent = "La photo n'a pas pu être envoyée : " + (e.message||e); return; }
+    const { error } = await sb.from('reviews').insert({customer, message, rating, photo});
+    if(error){ msg.textContent = /reviews/.test(error.message||'') ? "Lancez d'abord la mise à jour Supabase (2026-10-22-avis-partage.sql)." : 'Erreur : '+error.message; return; }
+    await logActivity(currentUser.name, 'a ajouté un avis de ' + customer);
+    ['revName','revMessage','revPhoto'].forEach(id=> document.getElementById(id).value = '');
+    msg.textContent = 'Avis ajouté ✓';
+    await loadReviews(); renderReviews(); renderReviewsAdmin();
+    setTimeout(()=> msg.textContent = '', 2500);
+  });
+
+  /* ---------- PHOTO DE PARTAGE (WhatsApp / Facebook) ---------- */
+  function renderSharePreview(){
+    const el = document.getElementById('sharePreview');
+    if(!el) return;
+    el.innerHTML = settings.share_image
+      ? `<img src="${escapeHtml(settings.share_image)}" alt="Photo de partage">`
+      : 'Actuellement : photo automatique (une de vos pièces).';
+  }
+  async function saveShareImage(url){
+    const msg = document.getElementById('shareMsg');
+    const { error } = await sb.from('settings').update({share_image: url}).eq('id', true);
+    if(error){ msg.textContent = /share_image/.test(error.message||'') ? "Lancez d'abord la mise à jour Supabase (2026-10-22-avis-partage.sql)." : 'Erreur : '+error.message; return false; }
+    await loadSettings();
+    renderSharePreview();
+    msg.textContent = url ? "Photo enregistrée ✓ (WhatsApp et Facebook peuvent garder l'ancienne image en mémoire quelques jours)" : 'Retour à la photo automatique ✓';
+    return true;
+  }
+  document.getElementById('saveShareBtn').addEventListener('click', async ()=>{
+    const file = document.getElementById('sharePhoto').files[0];
+    const msg = document.getElementById('shareMsg');
+    if(!file){ msg.textContent = 'Choisissez une photo.'; return; }
+    msg.textContent = 'Envoi…';
+    try{
+      const url = await uploadProductPhoto(file, 'partage');
+      if(await saveShareImage(url)) document.getElementById('sharePhoto').value = '';
+    }catch(e){ msg.textContent = 'Erreur : ' + (e.message||e); }
+  });
+  document.getElementById('resetShareBtn').addEventListener('click', ()=> saveShareImage(null));
+
   async function handleAuthSession(){
     const { data:{ user } } = await sb.auth.getUser();
     if(!user){ currentUser = null; return; }
     const { data } = await sb.from('team_members').select('id,name,role').eq('auth_user_id', user.id).maybeSingle();
     currentUser = data || null;
+    document.body.classList.toggle('team-logged', !!currentUser);
     if(currentUser){
       await Promise.all([loadProducts(), loadVariants()]);
       await Promise.all([loadTeam(), loadOrders()]);
@@ -620,7 +713,7 @@
     let pays = '';
     if(settings.online_payment) pays += `<div class="f-pay-item">${omLogo}<div>Paiement en ligne<small>Orange Money, validé sur votre téléphone</small></div></div>`;
     if(omNumber()) pays += `<div class="f-pay-item">${omLogo}<div>Transfert Orange Money<small>Au numéro de la boutique</small></div></div>`;
-    pays += `<div class="f-pay-item">${document.querySelector('.pay-opt[data-pay="livraison"] .cash-logo').outerHTML}<div>À la livraison<small>En espèces à la réception</small></div></div>`;
+    pays += `<div class="f-pay-item">${document.querySelector('.pay-opt[data-pay="livraison"] .cash-logo').outerHTML}<div>À la livraison<small>Selon disponibilité</small></div></div>`;
     document.getElementById('footPayments').innerHTML = pays;
   }
   function renderContactBar(){
@@ -1042,7 +1135,6 @@
     ['<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', 'Service <br>client']
   ];
   function heroSlideHtml(item){
-    const catNames = groupByCategory(products.filter(isApproved)).slice(0,4).map(g=>escapeHtml(g.name)).join(' • ');
     const features = HERO_FEATURES.map(([d,label])=>`<div class="hf"><span class="hf-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${d}</svg></span><span>${label}</span></div>`).join('');
     const priceHtml = item ? (promoActive()
       ? `<span class="hs-price">${effectivePrice(item.price).toLocaleString('fr-FR')} GNF</span><span class="hs-old">${Number(item.price).toLocaleString('fr-FR')} GNF</span><span class="promo-badge">-${settings.promo_percent}%</span>`
@@ -1052,7 +1144,7 @@
         <div class="hs-copy">
           <div class="hs-eyebrow">${promoActive() ? `Promotion -${settings.promo_percent}%` : 'Nouvelle collection'}</div>
           <div class="hs-title">Joda <br><span>Boutique</span></div>
-          ${catNames ? `<div class="hs-cats">${catNames}</div>` : ''}
+          <div class="hs-lead">Bijoux, sacs et accessoires tendance à Conakry, livrés partout en Guinée.</div>
           <div class="hs-script">L'excellence dans la qualité</div>
           <div class="hs-features">${features}</div>
           <button type="button" class="hs-cta">${item ? 'Voir la pièce' : 'Découvrir'} <span>→</span></button>
@@ -1424,6 +1516,7 @@
     stopInactivityTimer();
     await sb.auth.signOut();
     currentUser = null;
+    document.body.classList.remove('team-logged');
     if(ordersRealtimeChannel){ sb.removeChannel(ordersRealtimeChannel); ordersRealtimeChannel = null; }
     document.title = baseTitle;
     setView('admin');
@@ -2667,6 +2760,8 @@ Données des 7 derniers jours :
   }
 
   function renderSettingsTab(){
+    renderReviewsAdmin();
+    renderSharePreview();
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
     document.getElementById('setPhone').value = settings.phone || '';
     document.getElementById('setFacebook').value = settings.facebook || '';

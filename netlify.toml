@@ -8,3 +8,8 @@
   from = "/produit/*"
   to = "/.netlify/functions/product/:splat"
   status = 200
+
+[[redirects]]
+  from = "/apercu.jpg"
+  to = "/.netlify/functions/og-image"
+  status = 200

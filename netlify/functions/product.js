@@ -30,7 +30,7 @@ exports.handler = async (event) => {
   const description = product
     ? `${product.name} à ${Number(product.price).toLocaleString('fr-FR')} GNF. Bijoux et accessoires à Conakry, Guinée.`
     : "Bijoux et accessoires de qualité à Conakry, Guinée. Colliers, bracelets, boucles d'oreilles, bagues et sacs à commander en ligne.";
-  const image = (product && product.image && /^https?:\/\//.test(product.image)) ? product.image : `${SITE_URL}/logo.webp`;
+  const image = (product && product.image && /^https?:\/\//.test(product.image)) ? product.image : `${SITE_URL}/apercu.jpg`;
   const redirectUrl = product ? `${SITE_URL}/?p=${encodeURIComponent(product.id)}` : SITE_URL;
 
   const html = `<!doctype html>
