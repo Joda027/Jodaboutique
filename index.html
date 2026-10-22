@@ -584,6 +584,28 @@
       <select class="text-input" id="custDeliveryZone" style="display:none;">
         <option value="">Zone de livraison</option>
       </select>
+      <div class="pay-block">
+        <div class="pay-title">Mode de paiement</div>
+        <div class="pay-options">
+          <button type="button" class="pay-opt" data-pay="orange_money" id="payOptOm" style="display:none;">
+            <span class="om-logo">Orange<br>Money</span><span>Orange Money</span>
+          </button>
+          <button type="button" class="pay-opt active" data-pay="livraison">
+            <span class="cash-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5" stroke-linecap="round"/></svg></span><span>À la livraison</span>
+          </button>
+        </div>
+        <div id="omPanel" style="display:none;">
+          <div class="pay-info">
+            Envoyez le <strong>total à payer</strong> au numéro Orange Money de la boutique :
+            <div class="om-merchant"><span id="omMerchantNumber"></span><button type="button" class="btn-mini" id="copyOmMerchant">Copier</button></div>
+            Composez <strong>#144#</strong> (menu Orange Money), faites le transfert, puis notez la référence reçue par SMS.
+          </div>
+          <input class="text-input" id="omPayerPhone" placeholder="Votre numéro Orange Money *" inputmode="numeric">
+          <input class="text-input" id="omPayRef" placeholder="Référence de la transaction (reçue par SMS)">
+          <div class="pay-note">L'équipe vérifie votre paiement puis confirme votre commande.</div>
+        </div>
+        <div id="cashPanel" class="pay-info">Vous payez en espèces à la réception de votre commande.</div>
+      </div>
       <label class="checkbox-row" style="margin-bottom:10px;">
         <input type="checkbox" id="notifyOptIn" checked> Me prévenir du suivi de ma commande et des promotions
       </label>

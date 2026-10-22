@@ -69,6 +69,13 @@ create table if not exists orders (
   notified_cancel boolean not null default false,
   created_at timestamptz not null default now()
 );
+-- Mode de paiement choisi par la cliente (bases existantes : colonnes ajoutées ici).
+alter table orders add column if not exists payment_method text not null default 'livraison'
+  check (payment_method in ('orange_money','livraison'));
+alter table orders add column if not exists payment_phone text;
+alter table orders add column if not exists payment_ref text;
+alter table orders add column if not exists payment_status text not null default 'en attente'
+  check (payment_status in ('en attente','reçu'));
 
 create table if not exists likes (
   product_id text primary key references products(id) on delete cascade,
@@ -228,12 +235,16 @@ create trigger trg_prevent_role_escalation
 
 drop function if exists place_order(text, text, jsonb);
 drop function if exists place_order(text, text, jsonb, text);
+drop function if exists place_order(text, text, jsonb, text, text);
 create or replace function place_order(
   p_customer text,
   p_phone text,
   p_items jsonb,  -- [{"id": "...", "qty": 2, "variantId": "..." (optionnel)}, ...]
   p_address text default null,
-  p_delivery_zone text default null
+  p_delivery_zone text default null,
+  p_payment_method text default 'livraison',  -- 'orange_money' ou 'livraison'
+  p_payment_phone text default null,          -- numéro Orange Money qui a payé
+  p_payment_ref text default null             -- référence de transaction (SMS)
 ) returns jsonb
 language plpgsql
 security definer
@@ -273,6 +284,18 @@ begin
   end if;
   if p_items is null or jsonb_array_length(p_items) = 0 then
     raise exception 'Le panier est vide';
+  end if;
+  p_payment_method := coalesce(nullif(trim(p_payment_method), ''), 'livraison');
+  if p_payment_method not in ('orange_money','livraison') then
+    raise exception 'Mode de paiement invalide';
+  end if;
+  if p_payment_method = 'orange_money' then
+    if p_payment_phone is null or trim(p_payment_phone) !~ '^[0-9]+$' then
+      raise exception 'Numéro Orange Money invalide (chiffres uniquement)';
+    end if;
+  else
+    p_payment_phone := null;
+    p_payment_ref := null;
   end if;
 
   select coalesce(promo_active,false), coalesce(promo_percent,0), promo_ends_at,
@@ -347,16 +370,18 @@ begin
   -- v_total reste le montant des articles uniquement : les frais de livraison
   -- sont conservés à part (delivery_fee) et n'entrent pas dans les statistiques.
 
-  insert into orders (id, ts, customer, phone, address, delivery_zone, delivery_fee, items, total, status)
-  values (v_order_id, v_ts, trim(p_customer), trim(p_phone), trim(p_address), p_delivery_zone, v_delivery_fee, v_order_items, v_total, 'nouvelle');
+  insert into orders (id, ts, customer, phone, address, delivery_zone, delivery_fee, items, total, status,
+                      payment_method, payment_phone, payment_ref)
+  values (v_order_id, v_ts, trim(p_customer), trim(p_phone), trim(p_address), p_delivery_zone, v_delivery_fee, v_order_items, v_total, 'nouvelle',
+          p_payment_method, trim(p_payment_phone), nullif(trim(p_payment_ref), ''));
 
   insert into activity_log (actor, action)
   values ('Cliente : ' || trim(p_customer), 'a passé une commande de ' || v_total || ' GNF');
 
-  return jsonb_build_object('id', v_order_id, 'ts', v_ts, 'total', v_total, 'items', v_order_items, 'deliveryZone', p_delivery_zone, 'deliveryFee', v_delivery_fee);
+  return jsonb_build_object('id', v_order_id, 'ts', v_ts, 'total', v_total, 'items', v_order_items, 'deliveryZone', p_delivery_zone, 'deliveryFee', v_delivery_fee, 'paymentMethod', p_payment_method);
 end;
 $$;
-grant execute on function place_order(text, text, jsonb, text, text) to anon, authenticated;
+grant execute on function place_order(text, text, jsonb, text, text, text, text, text) to anon, authenticated;
 
 create or replace function like_product(p_product_id text)
 returns integer
