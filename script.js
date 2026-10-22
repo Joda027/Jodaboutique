@@ -579,8 +579,27 @@
     }
     el.innerHTML = html;
   }
+  // Pied de page : contacts (téléphone, WhatsApp, Facebook) et moyens de paiement acceptés.
+  function renderFooter(){
+    const num = waNumber();
+    const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
+    const fbUrl = (settings.facebook||'').trim();
+    let contacts = '';
+    if(phoneNum) contacts += `<a class="f-link" href="tel:+${phoneNum}"><span class="f-ico">${CALL_ICON}</span>+${phoneNum}</a>`;
+    if(num) contacts += `<a class="f-link wa" href="${waLink('Bonjour Joda Boutique !')}" target="_blank" rel="noopener"><span class="f-ico">${WA_ICON}</span>WhatsApp</a>`;
+    if(fbUrl) contacts += `<a class="f-link fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener"><span class="f-ico">${FB_ICON}</span>Notre page Facebook</a>`;
+    document.getElementById('footContacts').innerHTML = contacts || '<span class="f-sub">Bientôt disponible</span>';
+
+    const omLogo = '<span class="om-logo">Orange<br>Money</span>';
+    let pays = '';
+    if(settings.online_payment) pays += `<div class="f-pay-item">${omLogo}<div>Paiement en ligne<small>Orange Money, validé sur votre téléphone</small></div></div>`;
+    if(omNumber()) pays += `<div class="f-pay-item">${omLogo}<div>Transfert Orange Money<small>Au numéro de la boutique</small></div></div>`;
+    pays += `<div class="f-pay-item">${document.querySelector('.pay-opt[data-pay="livraison"] .cash-logo').outerHTML}<div>À la livraison<small>En espèces à la réception</small></div></div>`;
+    document.getElementById('footPayments').innerHTML = pays;
+  }
   function renderContactBar(){
     renderHeadContacts();
+    renderFooter();
     const bar = document.getElementById('contactBar');
     const num = waNumber();
     const phoneNum = (settings.phone||'').replace(/[^0-9]/g,'');
