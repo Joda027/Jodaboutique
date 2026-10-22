@@ -50,7 +50,6 @@
   let ordersRealtimeChannel = null;
   const baseTitle = document.title;
   let salesArchive = {count:0, revenue:0, byProduct:{}, byAssistant:{}};
-  let myArchivedSales = {count:0, sales:0};
   let sessionLikes = {};
   let activeCat = '';
 
@@ -228,14 +227,7 @@
   }
   async function loadSalesArchive(){
     salesArchive = {count:0, revenue:0, byProduct:{}, byAssistant:{}};
-    myArchivedSales = {count:0, sales:0};
-    if(!currentUser) return;
-    if(currentUser.role!=='admin'){
-      // Une assistante ne lit que sa propre part archivée (fonction my_archived_sales).
-      const { data, error } = await sb.rpc('my_archived_sales');
-      if(!error && data) myArchivedSales = {count:Number(data.count||0), sales:Number(data.sales||0)};
-      return;
-    }
+    if(!currentUser || currentUser.role!=='admin') return;
     let { data, error } = await sb.from('sales_archive').select('count,revenue,by_product,by_assistant').eq('id', true).maybeSingle();
     if(error) ({ data, error } = await sb.from('sales_archive').select('count,revenue,by_product').eq('id', true).maybeSingle());
     if(error) console.error('loadSalesArchive', error);
@@ -303,7 +295,6 @@
     if(currentUser){
       await Promise.all([loadProducts(), loadVariants()]);
       await Promise.all([loadTeam(), loadOrders()]);
-      if(currentUser.role!=='admin') await loadSalesArchive();
       if(currentUser.role==='admin'){
         await Promise.all([loadActivity(), loadExpenses(), loadOfflineSales(), loadSettings(), loadSalesArchive(), loadInvites(), loadTraffic()]);
       }
@@ -1635,14 +1626,6 @@
 
   function renderMyStatsTab(){
     renderMyWeekPanel();
-    const allTreated = assistantOrders(currentUser.id, o=>o.status==='traitée');
-    const cumCount = allTreated.length + myArchivedSales.count;
-    const cumSales = allTreated.reduce((s,o)=>s+Number(o.total||0),0) + myArchivedSales.sales;
-    document.getElementById('myCumulGrid').innerHTML = `
-      <div class="stat-card"><div class="num">${cumCount}</div><div class="lbl">Commandes traitées au total</div></div>
-      <div class="stat-card"><div class="num">${cumSales.toLocaleString('fr-FR')}</div><div class="lbl">Mes ventes au total (GNF)</div></div>
-      <div class="stat-card commission-highlight"><div class="num">${Math.round(cumSales*COMMISSION_RATE).toLocaleString('fr-FR')}</div><div class="lbl">Mes commissions au total (GNF)</div></div>
-    `;
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const mk = monthKey(now);

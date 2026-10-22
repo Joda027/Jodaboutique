@@ -398,13 +398,6 @@ end;
 $$;
 grant execute on function place_order(text, text, jsonb, text, text, text, text, text) to anon, authenticated;
 
--- Cumul archivé de l'assistante connectée (la table sales_archive n'est lisible que par l'admin).
-create or replace function my_archived_sales()
-returns jsonb language sql stable security definer set search_path = public as $$
-  select coalesce(by_assistant -> (current_team_id()::text), '{}'::jsonb) from sales_archive where id = true;
-$$;
-grant execute on function my_archived_sales() to authenticated;
-
 create or replace function like_product(p_product_id text)
 returns integer
 language plpgsql
