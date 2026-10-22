@@ -245,7 +245,7 @@
   .price-old-row{ display:flex; align-items:center; gap:6px; width:100%; }
   .tag-card .price-old{ font-size:12px; color:var(--muted); text-decoration:line-through; }
   .promo-badge{
-    display:inline-block; background:var(--wine); color:#fff; font-family:'Montserrat', sans-serif;
+    display:inline-block; background:linear-gradient(120deg, #B3121B, var(--red) 50%, #FF6A1A); color:#fff; font-family:'Montserrat', sans-serif;
     font-size:10px; font-weight:600; letter-spacing:.3px; padding:2px 6px; border-radius:20px;
   }
   .tag-card .stock{ font-size:11.5px; color:#1B7A3D; margin-bottom:10px; }
@@ -258,8 +258,9 @@
   .tag-card button.add:hover{ background:#0F1D4F; }
   .tag-card button.add:disabled{ background:#C9CDD8; cursor:not-allowed; }
   .card-promo{
-    position:absolute; top:20px; left:52px; z-index:2; background:var(--red); color:#fff; font-size:11px; font-weight:800;
-    padding:3px 7px; border-radius:4px;
+    position:absolute; top:20px; left:52px; z-index:2; color:#fff; font-family:'Montserrat', sans-serif; font-size:14px; font-weight:900;
+    padding:5px 10px; border-radius:20px; border:1.5px solid var(--gold);
+    background:linear-gradient(120deg, #B3121B, var(--red) 50%, #FF6A1A); box-shadow:0 4px 12px rgba(215,38,46,.35);
   }
 
   /* ---------- CART DRAWER ---------- */
@@ -583,27 +584,55 @@
   .num-pos{ color:var(--navy); font-family:'Montserrat', sans-serif;}
   .num-neg{ color:var(--wine); font-family:'Montserrat', sans-serif;}
 
-  /* ---------- PROMOTION COUNTDOWN (pinned) ---------- */
+  /* ---------- BADGE PROMOTION (flottant, change de place sur la page) ---------- */
   .promo-countdown{
-    position:fixed; bottom:24px; left:24px; z-index:80;
-    display:flex; align-items:center; gap:11px;
-    background:var(--wine); color:#fff; border-radius:36px; padding:14px 22px;
-    font-family:'Montserrat', sans-serif; font-size:15px; font-weight:600; white-space:nowrap;
-    box-shadow:0 12px 30px rgba(122,26,54,0.38);
-    animation: promo-bounce 2.4s ease-in-out infinite;
+    position:fixed; z-index:85; display:flex; align-items:center; gap:12px; cursor:pointer;
+    padding:8px 20px 8px 8px; border-radius:60px; color:#fff; white-space:nowrap;
+    background:linear-gradient(120deg, #B3121B 0%, var(--red) 45%, #FF6A1A 100%);
+    border:2px solid var(--gold); overflow:hidden;
+    box-shadow:0 14px 34px rgba(215,38,46,.45), 0 0 0 6px rgba(232,199,122,.25);
+    transition:opacity .45s ease, transform .45s ease;
+    animation:promo-glow 2.2s ease-in-out infinite;
   }
-  .promo-countdown .pc-icon{ font-size:20px; animation: promo-pulse 1.2s ease-in-out infinite; }
-  @keyframes promo-bounce{
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
+  /* reflet qui traverse le badge */
+  .promo-countdown::after{
+    content:''; position:absolute; top:0; bottom:0; width:40%; left:-60%;
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent);
+    animation:promo-shine 3.2s ease-in-out infinite;
   }
-  @keyframes promo-pulse{
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.25); }
+  .promo-countdown.hop{ opacity:0; transform:scale(.6); }
+  .promo-countdown:hover{ filter:brightness(1.06); }
+  .pc-pct{
+    font-family:'Montserrat', sans-serif; font-weight:900; font-size:30px; line-height:1; letter-spacing:-1px;
+    background:#fff; color:var(--red); border-radius:50px; padding:12px 14px;
+    box-shadow:inset 0 0 0 2px var(--gold);
   }
+  .pc-body{ display:flex; flex-direction:column; gap:2px; position:relative; z-index:1; }
+  .pc-title{ font-family:'Montserrat', sans-serif; font-weight:800; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); }
+  .pc-text{ font-family:'Montserrat', sans-serif; font-weight:700; font-size:14px; }
+  /* emplacements successifs (sans gêner panier, chat ni en-tête) */
+  .promo-countdown.pos-0{ left:24px; bottom:24px; }
+  .promo-countdown.pos-1{ right:24px; top:150px; }
+  .promo-countdown.pos-2{ left:24px; top:50%; }
+  .promo-countdown.pos-3{ right:24px; bottom:100px; }
+  body.view-admin .promo-countdown{ display:none !important; }
+  @keyframes promo-glow{
+    0%, 100% { box-shadow:0 14px 34px rgba(215,38,46,.45), 0 0 0 6px rgba(232,199,122,.25); }
+    50% { box-shadow:0 18px 40px rgba(215,38,46,.6), 0 0 0 12px rgba(232,199,122,.12); }
+  }
+  @keyframes promo-shine{ 0%{ left:-60%; } 55%, 100%{ left:130%; } }
   @media (max-width: 640px){
-    .promo-countdown{ left:14px; bottom:14px; padding:11px 16px; font-size:13px; gap:8px; max-width:calc(100vw - 90px); overflow:hidden; text-overflow:ellipsis; }
-    .promo-countdown .pc-icon{ font-size:17px; }
+    .promo-countdown{ padding:6px 14px 6px 6px; gap:9px; max-width:calc(100vw - 92px); }
+    .pc-pct{ font-size:22px; padding:9px 10px; }
+    .pc-title{ font-size:11px; }
+    .pc-text{ font-size:12px; }
+    .promo-countdown.pos-0{ left:12px; bottom:16px; }
+    .promo-countdown.pos-1{ right:12px; top:150px; }
+    .promo-countdown.pos-2{ left:12px; top:55%; }
+    .promo-countdown.pos-3{ right:12px; bottom:92px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .promo-countdown, .promo-countdown::after{ animation:none; }
   }
 
   /* ---------- CHATBOT ---------- */

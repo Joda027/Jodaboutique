@@ -192,35 +192,59 @@
   }
 
   let promoCountdownTimer = null;
+  let promoHopTimer = null;
+  const PROMO_SPOTS = 4;
   function renderPromoCountdown(){
     const el = document.getElementById('promoCountdown');
     if(!el) return;
     if(promoCountdownTimer){ clearInterval(promoCountdownTimer); promoCountdownTimer = null; }
-    if(!promoActive() || !settings.promo_ends_at){
+    if(promoHopTimer){ clearInterval(promoHopTimer); promoHopTimer = null; }
+    if(!promoActive()){
       el.style.display = 'none';
       return;
     }
-    const endTs = new Date(settings.promo_ends_at).getTime();
+    document.getElementById('promoPct').textContent = `-${settings.promo_percent}%`;
     const textEl = document.getElementById('promoCountdownText');
-    const tick = () => {
-      const diff = endTs - Date.now();
-      if(diff <= 0){
-        el.style.display = 'none';
-        clearInterval(promoCountdownTimer); promoCountdownTimer = null;
-        return;
-      }
-      const days = Math.floor(diff / 86400000);
-      const hours = Math.floor((diff % 86400000) / 3600000);
-      const mins = Math.floor((diff % 3600000) / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-      const pad = n => String(n).padStart(2,'0');
-      const parts = days > 0 ? `${days}j ${pad(hours)}h ${pad(mins)}m` : `${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
-      textEl.textContent = `-${settings.promo_percent}% · Fin dans ${parts}`;
-    };
     el.style.display = 'flex';
-    tick();
-    promoCountdownTimer = setInterval(tick, 1000);
+
+    if(settings.promo_ends_at){
+      const endTs = new Date(settings.promo_ends_at).getTime();
+      const tick = () => {
+        const diff = endTs - Date.now();
+        if(diff <= 0){ renderPromoCountdown(); renderStore(); renderCarousel(); renderCategoryShowcase(); renderCart(); return; }
+        const days = Math.floor(diff / 86400000);
+        const hours = Math.floor((diff % 86400000) / 3600000);
+        const mins = Math.floor((diff % 3600000) / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        const pad = n => String(n).padStart(2,'0');
+        const parts = days > 0 ? `${days}j ${pad(hours)}h ${pad(mins)}m` : `${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+        textEl.textContent = `Fin dans ${parts}`;
+      };
+      tick();
+      promoCountdownTimer = setInterval(tick, 1000);
+    } else {
+      textEl.textContent = 'Sur toute la boutique';
+    }
+
+    // Le badge change de place toutes les 7 secondes (sauf si l'utilisateur préfère moins d'animations).
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let spot = 0;
+    promoHopTimer = setInterval(()=>{
+      el.classList.add('hop');
+      setTimeout(()=>{
+        el.classList.remove('pos-'+spot);
+        spot = (spot + 1) % PROMO_SPOTS;
+        el.classList.add('pos-'+spot);
+        el.classList.remove('hop');
+      }, 450);
+    }, 7000);
   }
+  function openPromoProducts(){
+    setView('store');
+    selectCategory('__promo');
+  }
+  document.getElementById('promoCountdown').addEventListener('click', openPromoProducts);
+  document.getElementById('promoCountdown').addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openPromoProducts(); } });
   function effectivePrice(price){
     if(!promoActive()) return Number(price);
     return Math.round(Number(price) * (1 - Number(settings.promo_percent)/100));
