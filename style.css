@@ -55,13 +55,8 @@
 
   /* « Espace équipe » : seulement en bas de page pour les clientes, dans l'en-tête une fois connectée */
   body:not(.team-logged) .team-link{ display:none !important; }
-  .team-fab{
-    position:fixed; right:12px; bottom:10px; z-index:80; background:#fff; color:var(--navy);
-    border:1px solid var(--line); border-radius:20px; padding:4px 11px; font-family:'Montserrat', sans-serif;
-    font-size:11px; font-weight:700; box-shadow:0 4px 12px rgba(22,41,107,.15); cursor:pointer;
-  }
-  .team-fab:hover{ border-color:var(--navy); }
-  body.view-admin .team-fab, .drawer.open ~ .team-fab{ display:none; }
+  .footer-team{ background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.3); color:#fff; font:inherit; font-weight:600; padding:4px 12px; border-radius:20px; cursor:pointer; }
+  .footer-team:hover{ background:rgba(255,255,255,.2); }
 
   /* ---------- EN-TÊTE ---------- */
   body.view-admin .store-only{ display:none !important; }
@@ -442,7 +437,9 @@
   .f-pay-item .om-logo{ width:30px; height:30px; }
   .f-pay-item .cash-logo{ width:30px; height:30px; background:#fff; }
   .f-pay-item small{ display:block; opacity:.75; font-size:11.5px; }
-  .footer-copy{ border-top:1px solid rgba(255,255,255,.12); text-align:center; padding:14px; font-size:12px; opacity:.75; }
+  .footer-copy{ border-top:1px solid rgba(255,255,255,.12); display:flex; justify-content:space-between; align-items:center; gap:12px;
+    max-width:1180px; margin:0 auto; padding:14px 28px 14px; padding-right:100px; font-size:12px; }
+  .footer-copy > span{ opacity:.75; }
   @media (max-width:760px){ .footer-grid{ grid-template-columns:1fr; gap:22px; padding:28px 18px 20px; } }
 
   /* ---------- BANDEAU PRINCIPAL (diaporama des pièces en vedette) ---------- */
@@ -658,7 +655,7 @@
   .promo-countdown.pos-0{ left:24px; bottom:24px; }
   .promo-countdown.pos-1{ right:24px; top:150px; }
   .promo-countdown.pos-2{ left:24px; top:50%; }
-  .promo-countdown.pos-3{ right:24px; bottom:120px; }
+  .promo-countdown.pos-3{ right:24px; bottom:100px; }
   body.view-admin .promo-countdown{ display:none !important; }
   @keyframes promo-glow{
     0%, 100% { box-shadow:0 14px 34px rgba(215,38,46,.45), 0 0 0 6px rgba(232,199,122,.25); }
@@ -673,7 +670,7 @@
     .promo-countdown.pos-0{ left:12px; bottom:16px; }
     .promo-countdown.pos-1{ right:12px; top:150px; }
     .promo-countdown.pos-2{ left:12px; top:55%; }
-    .promo-countdown.pos-3{ right:12px; bottom:112px; }
+    .promo-countdown.pos-3{ right:12px; bottom:92px; }
   }
   @media (prefers-reduced-motion: reduce){
     .promo-countdown, .promo-countdown::after{ animation:none; }
@@ -681,12 +678,12 @@
 
   /* ---------- CHATBOT ---------- */
   .chat-fab{
-    position:fixed; bottom:44px; right:22px; z-index:80;
+    position:fixed; bottom:22px; right:22px; z-index:80;
     background:var(--navy); color:#fff; border:none; border-radius:50%; width:56px; height:56px;
     font-size:22px; box-shadow:0 10px 26px rgba(22,41,107,0.3); display:flex; align-items:center; justify-content:center;
   }
   .chat-panel{
-    position:fixed; bottom:112px; right:22px; z-index:80; width:340px; max-width:calc(100vw - 32px);
+    position:fixed; bottom:90px; right:22px; z-index:80; width:340px; max-width:calc(100vw - 32px);
     height:440px; max-height:70vh; background:var(--bg-panel); border:1px solid var(--line); border-radius:10px;
     display:none; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(22,41,107,0.18);
   }
