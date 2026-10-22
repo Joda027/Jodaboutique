@@ -369,6 +369,8 @@
   .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin-bottom:24px;}
   .stat-card{ background:var(--bg-panel); border:1px solid var(--line); border-left:4px solid var(--navy); border-radius:12px; padding:18px 20px;}
   .stat-card .num{ font-family:'Montserrat', sans-serif; font-size:24px; color:var(--navy); font-weight:800;}
+  .cumul-panel{ margin-bottom:20px; border-top:4px solid var(--gold); }
+  .cumul-row-archive td{ color:var(--muted); font-style:italic; }
   .stat-card .lbl{ font-size:12px; color:var(--muted); margin-top:4px;}
   .stat-card.net-highlight{ background:#F7EAEC; border-color:rgba(124,59,68,0.3); border-left-color:var(--wine); }
   .stat-card.net-highlight .num{ color:var(--wine); }

@@ -351,6 +351,21 @@
       </div>
 
       <div id="tab-finances" class="tab-content" style="display:none;">
+        <div class="panel cumul-panel">
+          <h4>Cumul depuis la création du site</h4>
+          <p class="section-note" id="cumulSince" style="margin-bottom:12px;"></p>
+          <div class="stat-grid" id="cumulGrid"></div>
+          <h4 style="margin-top:8px;">Évolution mois par mois</h4>
+          <div class="table-scroll"><table class="admin-table">
+            <thead><tr><th>Mois</th><th>Ventes</th><th>Dépenses</th><th>Commissions</th><th>Net du mois</th><th>Net cumulé</th></tr></thead>
+            <tbody id="cumulMonthsBody"></tbody>
+          </table></div>
+          <h4 style="margin-top:22px;">Cumul par assistante</h4>
+          <div class="table-scroll"><table class="admin-table">
+            <thead><tr><th>Assistante</th><th>Commandes traitées</th><th>Ventes traitées</th><th>Commissions cumulées</th><th>Net pour la boutique</th></tr></thead>
+            <tbody id="cumulAssistantsBody"></tbody>
+          </table></div>
+        </div>
         <div class="panel">
           <h4>Ajouter une dépense ou un achat</h4>
           <div class="fin-form">
@@ -406,6 +421,10 @@
 
       <div id="tab-mystats" class="tab-content" style="display:none;">
         <div class="stat-grid" id="myStatsGrid"></div>
+        <div class="panel cumul-panel">
+          <h4>Mon cumul depuis le début</h4>
+          <div class="stat-grid" id="myCumulGrid" style="margin-bottom:0;"></div>
+        </div>
         <div class="panel">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
             <h4 style="margin:0;">Ma semaine (lundi → dimanche)</h4>

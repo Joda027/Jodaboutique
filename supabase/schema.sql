@@ -144,6 +144,8 @@ create table if not exists sales_archive (
   revenue numeric not null default 0,
   by_product jsonb not null default '{}'::jsonb
 );
+-- Ventes traitées archivées par assistante : { "<team_member id>": {"count": n, "sales": montant} }
+alter table sales_archive add column if not exists by_assistant jsonb not null default '{}'::jsonb;
 insert into sales_archive (id) values (true) on conflict (id) do nothing;
 
 -- Abonnés aux notifications push (navigateur)
@@ -395,6 +397,13 @@ begin
 end;
 $$;
 grant execute on function place_order(text, text, jsonb, text, text, text, text, text) to anon, authenticated;
+
+-- Cumul archivé de l'assistante connectée (la table sales_archive n'est lisible que par l'admin).
+create or replace function my_archived_sales()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(by_assistant -> (current_team_id()::text), '{}'::jsonb) from sales_archive where id = true;
+$$;
+grant execute on function my_archived_sales() to authenticated;
 
 create or replace function like_product(p_product_id text)
 returns integer
