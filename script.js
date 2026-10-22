@@ -509,6 +509,11 @@
       html += `<a class="head-item wa" href="${waLink('Bonjour Joda Boutique, je souhaite commander.')}" target="_blank" rel="noopener">
         <span class="hi-icon">${WA_ICON}</span><span class="hi-text">WhatsApp<small>Commander</small></span></a>`;
     }
+    const fbUrl = (settings.facebook||'').trim();
+    if(fbUrl){
+      html += `<a class="head-item fb" href="${escapeHtml(fbUrl)}" target="_blank" rel="noopener" title="Notre page Facebook">
+        <span class="hi-icon">${FB_ICON}</span><span class="hi-text">Facebook<small>Notre page</small></span></a>`;
+    }
     el.innerHTML = html;
   }
   function renderContactBar(){
