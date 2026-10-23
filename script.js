@@ -275,6 +275,8 @@
     renderDeliveryZoneOptions();
     loadReviews().then(renderReviews);
     renderPaymentOptions();
+    restoreCart();
+    renderCart();
 
     handlePaymentReturn();
 
@@ -1223,7 +1225,26 @@
     openDrawer();
   }
 
+  // Le panier est gardé dans le navigateur pour survivre à un rechargement de page.
+  const CART_KEY = 'joda_cart';
+  function saveCart(){
+    try{ localStorage.setItem(CART_KEY, JSON.stringify(cart)); }catch(e){ /* stockage indisponible : panier en mémoire seulement */ }
+  }
+  function restoreCart(){
+    let saved = {};
+    try{ saved = JSON.parse(localStorage.getItem(CART_KEY) || '{}') || {}; }catch(e){ saved = {}; }
+    cart = {};
+    Object.entries(saved).forEach(([key, qty])=>{
+      const {productId, variantId} = parseCartKey(key);
+      const p = products.find(x=>x.id===productId && isApproved(x));
+      if(!p) return;
+      const stock = variantId ? Number((variants.find(v=>v.id===variantId)||{}).stock || 0) : Number(p.stock);
+      const n = Math.min(Number(qty)||0, stock);
+      if(n > 0) cart[key] = n;
+    });
+  }
   function renderCart(){
+    saveCart();
     const keys = Object.keys(cart).filter(k=>cart[k]>0);
     const count = keys.reduce((s,k)=>s+cart[k],0);
     document.getElementById('cartCount').textContent = count;
