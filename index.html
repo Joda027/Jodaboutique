@@ -146,6 +146,16 @@
     </div>
   </section>
 
+  <section class="social-section" id="socialSection" style="display:none;">
+    <div class="wrap">
+      <div class="section-head"><h2 class="section-title">Suivez-nous</h2></div>
+      <div class="social-row">
+        <div class="embed-box embed-video" id="ytEmbed"></div>
+        <div class="embed-box embed-fb" id="fbEmbed"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="reviews-section" id="reviewsSection" style="display:none;">
     <div class="wrap">
       <div class="section-head"><h2 class="section-title">Elles nous font confiance</h2></div>
@@ -499,6 +509,24 @@
           <div class="status-msg" id="contactMsg"></div>
         </div>
         <div class="panel" style="max-width:520px;">
+          <h4>Mesure & publicité</h4>
+          <p class="section-note" style="margin-bottom:12px;">Laissez vide ce que vous n'utilisez pas. Dès qu'un champ est rempli, un bandeau cookies demande l'accord des visiteuses : rien n'est chargé sans leur accord.</p>
+          <label class="set-label">Pixel Facebook (Meta) — identifiant</label>
+          <input class="text-input" id="setFbPixel" placeholder="ex : 123456789012345" inputmode="numeric">
+          <label class="set-label">Pixel TikTok — identifiant</label>
+          <input class="text-input" id="setTiktokPixel" placeholder="ex : C4ABCDEF123456789">
+          <label class="set-label">Google Analytics — identifiant de mesure</label>
+          <input class="text-input" id="setGaId" placeholder="ex : G-ABC123XYZ">
+          <label class="set-label">Google Ads — identifiant et libellé de conversion « achat »</label>
+          <input class="text-input" id="setGadsId" placeholder="ex : AW-123456789">
+          <input class="text-input" id="setGadsLabel" placeholder="ex : AbCdEfGhIjK (libellé de conversion)">
+          <label class="set-label">Vidéo YouTube à afficher sur la boutique (lien)</label>
+          <input class="text-input" id="setYoutube" placeholder="ex : https://www.youtube.com/watch?v=...">
+          <label class="checkbox-row" style="margin-bottom:12px;"><input type="checkbox" id="setFbFeed"> Afficher le fil de notre page Facebook (lien renseigné dans Coordonnées)</label>
+          <button class="btn-mini" id="saveTrackingBtn">Enregistrer</button>
+          <div class="status-msg" id="trackingMsg"></div>
+        </div>
+        <div class="panel" style="max-width:520px;">
           <h4>Avis de clientes</h4>
           <p class="section-note" style="margin-bottom:12px;">Affichés sur la boutique dans « Elles nous font confiance ». Ajoutez uniquement de vrais avis, <strong>avec l'accord de la cliente</strong> (photo portant vos bijoux ou capture d'un message WhatsApp).</p>
           <input class="text-input" id="revName" placeholder="Prénom de la cliente (ex : Mariama, Kaloum)">
@@ -630,7 +658,7 @@
       <div class="f-pay" id="footPayments"></div>
     </div>
   </div>
-  <div class="footer-copy"><span>© 2026 Joda Boutique · <a href="informations.html#cgv">Conditions de vente</a> · <a href="informations.html#confidentialite">Confidentialité</a> · <a href="informations.html#mentions">Mentions légales</a></span><button type="button" class="footer-team" data-view="admin">Espace équipe</button></div>
+  <div class="footer-copy"><span>© 2026 Joda Boutique · <a href="informations.html#cgv">Conditions de vente</a> · <a href="informations.html#confidentialite">Confidentialité</a> · <a href="informations.html#mentions">Mentions légales</a> · <button type="button" class="footer-link-btn" id="manageCookies" style="display:none;">Gérer les cookies</button></span><button type="button" class="footer-team" data-view="admin">Espace équipe</button></div>
 </footer>
 
 <!-- IMAGE LIGHTBOX -->
@@ -693,6 +721,24 @@
     <button class="btn-primary" style="width:100%;" id="checkoutBtn">Commander</button>
     <p class="checkout-legal">En commandant, vous acceptez nos <a href="informations.html#cgv" target="_blank">conditions de vente</a> et notre <a href="informations.html#confidentialite" target="_blank">politique de confidentialité</a>.</p>
     <div class="status-msg" id="checkoutMsg"></div>
+  </div>
+</div>
+
+<!-- BANDEAU COOKIES (seulement si un outil de mesure / publicité / vidéo est configuré) -->
+<div class="consent-banner" id="consentBanner" style="display:none;" role="dialog" aria-label="Cookies">
+  <div class="consent-title">🍪 Vos cookies, votre choix</div>
+  <p class="consent-text">Nous utilisons des cookies pour mesurer nos visites et nos publicités, et pour afficher nos vidéos et notre page Facebook. Rien n'est activé sans votre accord. <a href="informations.html#confidentialite" target="_blank">En savoir plus</a></p>
+  <div class="consent-details">
+    <label class="consent-row"><input type="checkbox" checked disabled> <span><strong>Nécessaires</strong> — panier et connexion (toujours actifs)</span></label>
+    <label class="consent-row" id="consentStatsRow"><input type="checkbox" id="consentStats"> <span><strong>Statistiques</strong> — Google Analytics</span></label>
+    <label class="consent-row" id="consentAdsRow"><input type="checkbox" id="consentAds"> <span><strong>Publicité</strong> — pixels Facebook / TikTok, Google Ads</span></label>
+    <label class="consent-row" id="consentMediaRow"><input type="checkbox" id="consentMedia"> <span><strong>Vidéos et réseaux sociaux</strong> — YouTube, Facebook</span></label>
+  </div>
+  <div class="consent-actions">
+    <button type="button" class="btn-ghost" id="consentRefuse">Refuser</button>
+    <button type="button" class="btn-ghost consent-only-simple" id="consentCustomize">Personnaliser</button>
+    <button type="button" class="btn-ghost consent-only-detailed" id="consentSave">Enregistrer mes choix</button>
+    <button type="button" class="btn-primary" id="consentAccept">Tout accepter</button>
   </div>
 </div>
 

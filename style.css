@@ -37,6 +37,40 @@
   .tb-sep{ opacity:.5; }
   @media (max-width:640px){ .tb-hide-m{ display:none; } .topbar{ font-size:11.5px; gap:6px; padding:6px 8px; } }
 
+  /* ---------- BANDEAU COOKIES ---------- */
+  .consent-banner{
+    position:fixed; left:16px; bottom:16px; z-index:120; max-width:440px; width:calc(100% - 32px);
+    background:#fff; border:1px solid var(--line); border-top:4px solid var(--gold); border-radius:14px;
+    box-shadow:0 18px 50px rgba(16,22,40,.25); padding:18px 18px 16px;
+  }
+  body.view-admin .consent-banner{ display:none !important; }
+  .consent-title{ font-family:'Montserrat', sans-serif; font-weight:800; color:var(--navy); font-size:16px; margin-bottom:6px; }
+  .consent-text{ font-size:13px; line-height:1.5; color:var(--ink); margin:0 0 12px; }
+  .consent-text a{ color:var(--navy); }
+  .consent-details{ display:none; flex-direction:column; gap:8px; margin-bottom:12px; }
+  .consent-banner.detailed .consent-details{ display:flex; }
+  .consent-row{ display:flex; gap:8px; align-items:flex-start; font-size:12.5px; line-height:1.4; cursor:pointer; }
+  .consent-row input{ margin-top:2px; width:16px; height:16px; }
+  .consent-actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .consent-actions button{ padding:9px 14px; font-size:13px; }
+  .consent-banner .consent-only-detailed{ display:none; }
+  .consent-banner.detailed .consent-only-detailed{ display:inline-block; }
+  .consent-banner.detailed .consent-only-simple{ display:none; }
+  .consent-banner ~ .promo-countdown.pos-0{ bottom:24px; }
+  .footer-link-btn{ background:none; border:none; padding:0; color:inherit; font:inherit; text-decoration:underline; cursor:pointer; }
+  .set-label{ font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+
+  /* ---------- SUIVEZ-NOUS (YouTube / Facebook) ---------- */
+  .social-section{ padding:10px 0 20px; }
+  .social-row{ display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .embed-box{ background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .embed-video{ flex:2 1 420px; aspect-ratio:16/9; }
+  .embed-fb{ flex:1 1 300px; max-width:360px; height:480px; }
+  .embed-box iframe{ width:100%; height:100%; border:0; display:block; }
+  .embed-blocked{ height:100%; min-height:200px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:20px; text-align:center; background:var(--bg); }
+  .embed-blocked p{ font-size:13px; color:var(--muted); margin:0; max-width:300px; }
+  @media (max-width:640px){ .embed-fb{ max-width:none; height:420px; } }
+
   /* ---------- AVIS DE CLIENTES ---------- */
   .reviews-section{ padding:10px 0 30px; }
   .reviews-row{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:14px; }

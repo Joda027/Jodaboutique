@@ -134,13 +134,8 @@
     offlineSales = data || [];
   }
   async function loadSettings(){
-    const cols = 'whatsapp,phone,facebook,orange_money,promo_active,promo_percent,promo_ends_at,delivery_enabled,delivery_zones,categories';
-    // Colonnes ajoutées par les migrations : on retombe sur moins de colonnes si l'une manque.
-    let data = null, error = null;
-    for(const extra of [',online_payment,share_image', ',online_payment', '']){
-      ({ data, error } = await sb.from('settings').select(cols + extra).eq('id', true).maybeSingle());
-      if(!error) break;
-    }
+    // Toute la ligne : les colonnes ajoutées par les migrations apparaissent dès qu'elles existent.
+    const { data, error } = await sb.from('settings').select('*').eq('id', true).maybeSingle();
     if(error) console.error('loadSettings', error);
     settings = data || {whatsapp:'', phone:'', facebook:'', orange_money:'', promo_active:false, promo_percent:0, promo_ends_at:null, delivery_enabled:false, delivery_zones:[], categories:[]};
     categories = Array.isArray(settings.categories) ? settings.categories : [];
@@ -277,6 +272,7 @@
     renderPaymentOptions();
     restoreCart();
     renderCart();
+    initConsent();
 
     handlePaymentReturn();
 
@@ -404,6 +400,205 @@
     }catch(e){ msg.textContent = 'Erreur : ' + (e.message||e); }
   });
   document.getElementById('resetShareBtn').addEventListener('click', ()=> saveShareImage(null));
+
+  /* ---------- COOKIES : CONSENTEMENT, MESURE ET PUBLICITÉ ----------
+     Rien n'est chargé (pixel, Google, YouTube, Facebook) avant l'accord de la visiteuse.
+     Catégories : stats (Google Analytics), ads (pixels Facebook/TikTok, Google Ads),
+     media (vidéo YouTube, fil Facebook). Le choix est gardé dans le navigateur. */
+  const CONSENT_KEY = 'joda_consent';
+  const CONSENT_VERSION = 1;
+  // Identifiants nettoyés : ils sont insérés dans des URL et des scripts.
+  function trackingIds(){
+    const clean = (v, re) => { const t = String(v||'').trim(); return re.test(t) ? t : ''; };
+    return {
+      fb: clean(settings.fb_pixel_id, /^\d{5,20}$/),
+      tiktok: clean(settings.tiktok_pixel_id, /^[A-Z0-9]{8,30}$/i),
+      ga: clean(settings.ga_id, /^G-[A-Z0-9]{4,20}$/i),
+      gads: clean(settings.gads_id, /^AW-\d{5,15}$/i),
+      gadsLabel: clean(settings.gads_label, /^[A-Za-z0-9_-]{4,40}$/)
+    };
+  }
+  function youtubeId(url){
+    const m = String(url||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : '';
+  }
+  function facebookPageUrl(){
+    const fb = String(settings.facebook||'').trim();
+    return settings.fb_feed && /^https:\/\/(www\.|m\.)?facebook\.com\//.test(fb) ? fb : '';
+  }
+  function consentNeeded(){
+    const ids = trackingIds();
+    return { stats: !!ids.ga, ads: !!(ids.fb || ids.tiktok || ids.gads), media: !!(youtubeId(settings.youtube_url) || facebookPageUrl()) };
+  }
+  function readConsent(){
+    try{ const c = JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null'); return c && c.v === CONSENT_VERSION ? c : null; }
+    catch(e){ return null; }
+  }
+  let consent = {stats:false, ads:false, media:false};
+  function saveConsent(c){
+    consent = {stats:!!c.stats, ads:!!c.ads, media:!!c.media};
+    try{ localStorage.setItem(CONSENT_KEY, JSON.stringify({v:CONSENT_VERSION, ts:Date.now(), ...consent})); }catch(e){ /* choix valable pour cette visite seulement */ }
+  }
+  function loadScript(src){
+    const s = document.createElement('script'); s.async = true; s.src = src; document.head.appendChild(s);
+  }
+  const loaded = {};
+  function applyConsent(){
+    const ids = trackingIds();
+    if(consent.ads && ids.fb && !loaded.fb){
+      loaded.fb = true;
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;
+        s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      window.fbq('init', ids.fb); window.fbq('track', 'PageView');
+    }
+    if(consent.ads && ids.tiktok && !loaded.tiktok){
+      loaded.tiktok = true;
+      !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];
+        ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);
+        ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};
+        ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};
+        var o=d.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+      }(window,document,'ttq');
+      window.ttq.load(ids.tiktok); window.ttq.page();
+    }
+    const wantGa = consent.stats && ids.ga, wantAds = consent.ads && ids.gads;
+    if((wantGa || wantAds) && !loaded.gtagLib){
+      loaded.gtagLib = true;
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function(){ window.dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      loadScript('https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(wantGa ? ids.ga : ids.gads));
+    }
+    if(wantGa && !loaded.ga){ loaded.ga = true; window.gtag('config', ids.ga); }
+    if(wantAds && !loaded.gads){ loaded.gads = true; window.gtag('config', ids.gads); }
+    renderSocialEmbeds();
+  }
+  // Envoie un événement aux outils acceptés : add_to_cart, begin_checkout, purchase.
+  function trackEvent(name, data){
+    const ids = trackingIds();
+    const value = Math.round(Number(data.value)||0);
+    const contents = (data.items||[]).map(it=>({id:String(it.id), quantity:Number(it.qty)||1}));
+    try{
+      if(loaded.fb && window.fbq){
+        const fbName = {add_to_cart:'AddToCart', begin_checkout:'InitiateCheckout', purchase:'Purchase'}[name];
+        window.fbq('track', fbName, {value, currency:'GNF', contents, content_type:'product'});
+      }
+      if(loaded.tiktok && window.ttq){
+        const ttName = {add_to_cart:'AddToCart', begin_checkout:'InitiateCheckout', purchase:'CompletePayment'}[name];
+        window.ttq.track(ttName, {value, currency:'GNF', contents:contents.map(c=>({content_id:c.id, quantity:c.quantity}))});
+      }
+      if(window.gtag && (loaded.ga || loaded.gads)){
+        window.gtag('event', name, {value, currency:'GNF', transaction_id:data.orderId,
+          items:(data.items||[]).map(it=>({item_id:String(it.id), item_name:it.name, price:Number(it.price)||0, quantity:Number(it.qty)||1}))});
+        if(name==='purchase' && loaded.gads && ids.gadsLabel){
+          window.gtag('event', 'conversion', {send_to:`${ids.gads}/${ids.gadsLabel}`, value, currency:'GNF', transaction_id:data.orderId});
+        }
+      }
+    }catch(e){ console.error('trackEvent', e); }
+  }
+  function cartTrackingItems(){
+    return Object.keys(cart).filter(k=>cart[k]>0).map(key=>{
+      const {productId} = parseCartKey(key);
+      const p = products.find(x=>x.id===productId) || {};
+      return {id:productId, name:p.name||'', price:effectivePrice(p.price||0), qty:cart[key]};
+    });
+  }
+
+  // Bandeau de consentement : affiché seulement si un outil est configuré et qu'aucun choix n'est fait.
+  function showConsentBanner(force){
+    const need = consentNeeded();
+    const any = need.stats || need.ads || need.media;
+    document.getElementById('manageCookies').style.display = any ? '' : 'none';
+    if(!any) return;
+    const banner = document.getElementById('consentBanner');
+    document.getElementById('consentStatsRow').style.display = need.stats ? '' : 'none';
+    document.getElementById('consentAdsRow').style.display = need.ads ? '' : 'none';
+    document.getElementById('consentMediaRow').style.display = need.media ? '' : 'none';
+    document.getElementById('consentStats').checked = consent.stats;
+    document.getElementById('consentAds').checked = consent.ads;
+    document.getElementById('consentMedia').checked = consent.media;
+    banner.classList.toggle('detailed', !!force);
+    banner.style.display = (force || !readConsent()) ? '' : 'none';
+  }
+  function closeConsent(c){
+    saveConsent(c);
+    document.getElementById('consentBanner').style.display = 'none';
+    applyConsent();
+  }
+  document.getElementById('consentAccept').addEventListener('click', ()=> closeConsent({stats:true, ads:true, media:true}));
+  document.getElementById('consentRefuse').addEventListener('click', ()=> closeConsent({stats:false, ads:false, media:false}));
+  document.getElementById('consentCustomize').addEventListener('click', ()=> document.getElementById('consentBanner').classList.add('detailed'));
+  document.getElementById('consentSave').addEventListener('click', ()=> closeConsent({
+    stats: document.getElementById('consentStats').checked,
+    ads: document.getElementById('consentAds').checked,
+    media: document.getElementById('consentMedia').checked
+  }));
+  document.getElementById('manageCookies').addEventListener('click', ()=> showConsentBanner(true));
+  function initConsent(){
+    const saved = readConsent();
+    if(saved) consent = {stats:!!saved.stats, ads:!!saved.ads, media:!!saved.media};
+    showConsentBanner(false);
+    applyConsent();
+  }
+
+  // « Suivez-nous » : vidéo YouTube et fil Facebook, affichés après accord « vidéos et réseaux sociaux ».
+  function renderSocialEmbeds(){
+    const section = document.getElementById('socialSection');
+    const ytId = youtubeId(settings.youtube_url);
+    const fbUrl = facebookPageUrl();
+    section.style.display = (ytId || fbUrl) ? '' : 'none';
+    if(!ytId && !fbUrl) return;
+    const blocked = `<div class="embed-blocked">
+        <p>Ce contenu est fourni par YouTube / Facebook, qui peuvent déposer des cookies.</p>
+        <button type="button" class="btn-primary embed-allow">Afficher le contenu</button>
+      </div>`;
+    document.getElementById('ytEmbed').style.display = ytId ? '' : 'none';
+    document.getElementById('fbEmbed').style.display = fbUrl ? '' : 'none';
+    if(ytId) document.getElementById('ytEmbed').innerHTML = consent.media
+      ? `<iframe src="https://www.youtube-nocookie.com/embed/${ytId}" title="Vidéo Joda Boutique" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+      : blocked;
+    if(fbUrl) document.getElementById('fbEmbed').innerHTML = consent.media
+      ? `<iframe src="https://www.facebook.com/plugins/page.php?href=${encodeURIComponent(fbUrl)}&tabs=timeline&width=340&height=480&small_header=true&adapt_container_width=true&hide_cover=false" title="Page Facebook Joda Boutique" loading="lazy" scrolling="no" allow="encrypted-media"></iframe>`
+      : blocked;
+    section.querySelectorAll('.embed-allow').forEach(btn=> btn.addEventListener('click', ()=> closeConsent({...consent, media:true})));
+  }
+
+  // Réglages > Mesure & publicité
+  function renderTrackingSettings(){
+    if(!document.getElementById('setFbPixel')) return;
+    document.getElementById('setFbPixel').value = settings.fb_pixel_id || '';
+    document.getElementById('setTiktokPixel').value = settings.tiktok_pixel_id || '';
+    document.getElementById('setGaId').value = settings.ga_id || '';
+    document.getElementById('setGadsId').value = settings.gads_id || '';
+    document.getElementById('setGadsLabel').value = settings.gads_label || '';
+    document.getElementById('setYoutube').value = settings.youtube_url || '';
+    document.getElementById('setFbFeed').checked = !!settings.fb_feed;
+  }
+  document.getElementById('saveTrackingBtn').addEventListener('click', async ()=>{
+    const msg = document.getElementById('trackingMsg');
+    const v = id => document.getElementById(id).value.trim();
+    const fields = {
+      fb_pixel_id: v('setFbPixel').replace(/\D/g,'') || null,
+      tiktok_pixel_id: v('setTiktokPixel').toUpperCase() || null,
+      ga_id: v('setGaId').toUpperCase() || null,
+      gads_id: v('setGadsId').toUpperCase() || null,
+      gads_label: v('setGadsLabel') || null,
+      youtube_url: v('setYoutube') || null,
+      fb_feed: document.getElementById('setFbFeed').checked
+    };
+    if(fields.ga_id && !/^G-[A-Z0-9]{4,20}$/.test(fields.ga_id)){ msg.textContent = 'Identifiant Google Analytics invalide (format G-XXXXXXX).'; return; }
+    if(fields.gads_id && !/^AW-\d{5,15}$/.test(fields.gads_id)){ msg.textContent = 'Identifiant Google Ads invalide (format AW-123456789).'; return; }
+    if(fields.tiktok_pixel_id && !/^[A-Z0-9]{8,30}$/.test(fields.tiktok_pixel_id)){ msg.textContent = 'Identifiant du pixel TikTok invalide.'; return; }
+    if(fields.youtube_url && !youtubeId(fields.youtube_url)){ msg.textContent = 'Lien YouTube non reconnu (collez le lien de la vidéo).'; return; }
+    const { error } = await sb.from('settings').update(fields).eq('id', true);
+    if(error){ msg.textContent = /column/.test(error.message||'') ? "Lancez d'abord la mise à jour Supabase (2026-10-23-mesure.sql)." : 'Erreur : '+error.message; return; }
+    await loadSettings();
+    await logActivity(currentUser.name, 'a mis à jour la mesure et la publicité');
+    msg.textContent = 'Enregistré ✓ — les visiteuses verront le bandeau cookies à leur prochaine visite.';
+    showConsentBanner(false); applyConsent();
+    setTimeout(()=> msg.textContent = '', 4000);
+  });
 
   async function handleAuthSession(){
     const { data:{ user } } = await sb.auth.getUser();
@@ -1223,6 +1418,7 @@
     cart[key] = inCart + 1;
     renderCart();
     openDrawer();
+    trackEvent('add_to_cart', {value:effectivePrice(p.price), items:[{id:p.id, name:p.name, price:effectivePrice(p.price), qty:1}]});
   }
 
   // Le panier est gardé dans le navigateur pour survivre à un rechargement de page.
@@ -1349,6 +1545,8 @@
     });
 
     msg.textContent = 'Envoi en cours…';
+    const trackedItems = cartTrackingItems();
+    trackEvent('begin_checkout', {value: trackedItems.reduce((s,it)=>s+it.price*it.qty,0), items: trackedItems});
     let { data, error } = await sb.rpc('place_order', {p_customer:name, p_phone:phone, p_items:items, p_address:address, p_delivery_zone:deliveryZone,
       p_payment_method:paymentMethod, p_payment_phone:paymentMethod==='orange_money' ? payerPhone : null, p_payment_ref:payRef || null});
     if(error && error.code === 'PGRST202' && paymentMethod==='en_ligne'){
@@ -1369,6 +1567,7 @@
     renderCart(); renderStore(); renderCarousel(); renderCategoryShowcase();
     if(currentUser){ await loadOrders(); renderLoggedArea(); }
     notifyTeam('new_order', data.id);
+    trackEvent('purchase', {orderId: data.id, value: Number(data.total||0) + Number(data.deliveryFee||0), items: trackedItems});
 
     // Abonnement au suivi de commande (si la cliente l'a accepté).
     const optIn = document.getElementById('notifyOptIn');
@@ -2781,6 +2980,7 @@ Données des 7 derniers jours :
   }
 
   function renderSettingsTab(){
+    renderTrackingSettings();
     renderReviewsAdmin();
     renderSharePreview();
     document.getElementById('setWhatsapp').value = settings.whatsapp || '';
