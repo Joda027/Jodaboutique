@@ -280,6 +280,12 @@
     border-radius:20px; padding:6px 12px; margin:0 8px 8px 0; font-size:13px;
   }
   .cat-chip button{ background:none; border:none; color:var(--wine); font-size:15px; line-height:1; padding:0; }
+  .cat-row{ display:flex; align-items:center; gap:8px; background:var(--bg-panel-2); border:1px solid var(--line); border-radius:8px; padding:6px 8px 6px 10px; margin-bottom:6px; font-size:13.5px; }
+  .cat-row .cat-pos{ width:20px; color:var(--muted); font-weight:600; }
+  .cat-row .cat-row-name{ flex:1; font-weight:600; }
+  .cat-row button{ width:30px; height:30px; border:1px solid var(--line); background:#fff; border-radius:6px; font-size:15px; line-height:1; color:var(--navy); cursor:pointer; }
+  .cat-row button:disabled{ opacity:.35; cursor:default; }
+  .cat-row button.del{ color:var(--wine); }
   .tag-card{
     position:relative; background:#fff; border:1px solid var(--line); border-radius:10px;
     padding:12px 12px 14px; display:flex; flex-direction:column;

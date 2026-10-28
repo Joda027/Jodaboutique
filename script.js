@@ -15,11 +15,12 @@
     parfum: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="18" y="24" width="28" height="30" rx="4"/><path d="M26 24v-6h12v6M28 12h8v6h-8z" stroke-linejoin="round"/></svg>',
     robe: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M24 8l2 10-6 10-8 26h40l-8-26-6-10 2-10M26 18h12" stroke-linejoin="round" stroke-linecap="round"/></svg>',
     vetement: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M24 10l-14 8 5 10 5-3v29h24V25l5 3 5-10-14-8c-1 4-4 6-8 6s-7-2-8-6z" stroke-linejoin="round"/></svg>',
+    cosmetique: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="22" y="34" width="20" height="20" rx="2"/><path d="M25 34V22l7-8 7 8v12M25 26h14" stroke-linejoin="round"/></svg>',
     chapeau: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 40c0-12 7-22 16-22s16 10 16 22M8 42c8 4 40 4 48 0" stroke-linecap="round"/></svg>',
     promo: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="32" cy="32" r="22"/><path d="M24 40l16-16" stroke-linecap="round"/><circle cx="25" cy="25" r="3"/><circle cx="39" cy="39" r="3"/></svg>',
     autre: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><path d="M32 10l6 14 14 2-10 10 2 14-12-7-12 7 2-14-10-10 14-2z" stroke-linejoin="round"/></svg>'
   };
-  const ICON_ALIASES = {casquette:'chapeau', chemise:'vetement', habit:'vetement', 'vêtement':'vetement', pantalon:'vetement', basket:'chaussure', sandale:'chaussure', 'boucle':'boucles', 'écharpe':'foulard'};
+  const ICON_ALIASES = {casquette:'chapeau', chemise:'vetement', habit:'vetement', 'vêtement':'vetement', pantalon:'vetement', basket:'chaussure', sandale:'chaussure', 'boucle':'boucles', 'écharpe':'foulard', tenue:'vetement', jupe:'vetement', pagne:'vetement', boubou:'vetement', ensemble:'vetement', escarpin:'chaussure', talon:'chaussure', mule:'chaussure', 'cosmétique':'cosmetique', 'beauté':'cosmetique', maquillage:'cosmetique', soin:'cosmetique', 'crème':'cosmetique', senteur:'parfum', 'eau de':'parfum'};
   function iconFor(cat){
     const key = (cat||'').toLowerCase();
     for(const a of Object.keys(ICON_ALIASES)){ if(key.includes(a)) return ICONS[ICON_ALIASES[a]]; }
@@ -1335,6 +1336,13 @@
     ['<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke-linecap="round"/>', 'Commande <br>rapide'],
     ['<path d="M4 13a8 8 0 0116 0v4a2 2 0 01-2 2h-1v-6h3M4 13v4a2 2 0 002 2h1v-6H4" stroke-linejoin="round"/>', 'Service <br>client']
   ];
+  // Phrase d'accroche construite à partir des catégories publiées (les 3 premières).
+  function heroLead(){
+    const names = groupByCategory(products.filter(isApproved)).map(g=>g.name).filter(n=>n && n!=='Autre').slice(0,3);
+    if(!names.length) return 'Bijoux, sacs et accessoires';
+    const list = names.map((n,i)=> i ? n.toLowerCase() : n);
+    return list.length>1 ? list.slice(0,-1).join(', ')+' et '+list[list.length-1] : list[0];
+  }
   function heroSlideHtml(item){
     const features = HERO_FEATURES.map(([d,label])=>`<div class="hf"><span class="hf-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${d}</svg></span><span>${label}</span></div>`).join('');
     const priceHtml = item ? (promoActive()
@@ -1345,7 +1353,7 @@
         <div class="hs-copy">
           <div class="hs-eyebrow">${promoActive() ? `Promotion -${settings.promo_percent}%` : 'Nouvelle collection'}</div>
           <div class="hs-title">Joda <br><span>Boutique</span></div>
-          <div class="hs-lead">Bijoux, sacs et accessoires tendance à Conakry, livrés partout en Guinée.</div>
+          <div class="hs-lead">${escapeHtml(heroLead())} tendance à Conakry, livrés partout en Guinée.</div>
           <div class="hs-script">L'excellence dans la qualité</div>
           <div class="hs-features">${features}</div>
           <button type="button" class="hs-cta">${item ? 'Voir la pièce' : 'Découvrir'} <span>→</span></button>
@@ -2329,7 +2337,7 @@
       if(isAdmin) actions += `<button class="btn-mini" data-act="edit" data-id="${p.id}">Modifier</button>`;
       actions += `<button class="btn-mini" data-act="editprice" data-id="${p.id}">Prix</button>
           <button class="btn-mini" data-act="photo" data-id="${p.id}">Photo</button>
-          <button class="btn-mini" data-detail-variants="${p.id}">Couleurs${myVariants.length?' ('+myVariants.length+')':''}</button>
+          <button class="btn-mini" data-detail-variants="${p.id}">Couleurs / tailles${myVariants.length?' ('+myVariants.length+')':''}</button>
           ${myVariants.length===0 ? `<button class="btn-mini" data-act="restock" data-id="${p.id}">+ stock</button>` : ''}
           <button class="btn-mini danger" data-act="delete" data-id="${p.id}">Retirer</button>`;
       const openV = expandedVariantIds.has(p.id);
@@ -2356,12 +2364,12 @@
       <tr class="variant-detail-row" id="variantDetail-${p.id}" style="${openV?'':'display:none;'}">
         <td colspan="8">
           <div class="variant-manage">
-            ${variantRows || '<div class="section-note" style="margin-bottom:10px;">Aucune couleur ajoutée — la pièce reste vendue sans choix de couleur tant qu\'aucune n\'est ajoutée ici.</div>'}
+            ${variantRows || '<div class="section-note" style="margin-bottom:10px;">Aucune couleur ni taille ajoutée — la pièce reste vendue sans choix tant qu\'aucune n\'est ajoutée ici.</div>'}
             <div class="variant-add-form">
-              <input class="text-input" style="margin:0;" id="newColorName-${p.id}" placeholder="Nom de la couleur (ex: Or)">
+              <input class="text-input" style="margin:0;" id="newColorName-${p.id}" placeholder="Couleur ou taille (ex: Or, M, 39)">
               <input class="text-input" style="margin:0;" id="newColorStock-${p.id}" type="number" min="0" placeholder="Stock">
               <input class="text-input" style="margin:0;" id="newColorPhoto-${p.id}" type="file" accept="image/*">
-              <button class="btn-mini" data-vact="add" data-pid="${p.id}">Ajouter cette couleur</button>
+              <button class="btn-mini" data-vact="add" data-pid="${p.id}">Ajouter</button>
             </div>
             <div class="status-msg" id="variantMsg-${p.id}"></div>
           </div>
@@ -2390,7 +2398,7 @@
           const msg = document.getElementById('variantMsg-'+pid);
           const color = nameInput.value.trim();
           const stock = Math.max(0, Number(stockInput.value) || 0);
-          if(!color){ msg.textContent = 'Indiquez un nom de couleur.'; return; }
+          if(!color){ msg.textContent = 'Indiquez une couleur ou une taille.'; return; }
           const newId = 'v'+Date.now();
           let image = '';
           if(photoInput.files && photoInput.files[0]){
@@ -2755,10 +2763,16 @@
     const list = document.getElementById('categoriesList');
     if(list){
       list.innerHTML = categories.length
-        ? categories.map(c=>`<span class="cat-chip">${escapeHtml(c)}<button type="button" data-remove-cat="${escapeHtml(c)}" title="Supprimer">×</button></span>`).join('')
+        ? categories.map((c,i)=>`<div class="cat-row"><span class="cat-pos">${i+1}</span><span class="cat-row-name">${escapeHtml(c)}</span>
+            <button type="button" data-move-cat="${i}" data-dir="-1" title="Monter" ${i===0?'disabled':''}>↑</button>
+            <button type="button" data-move-cat="${i}" data-dir="1" title="Descendre" ${i===categories.length-1?'disabled':''}>↓</button>
+            <button type="button" class="del" data-remove-cat="${escapeHtml(c)}" title="Supprimer">×</button></div>`).join('')
         : '<div class="section-note">Aucune catégorie pour l\'instant.</div>';
       list.querySelectorAll('button[data-remove-cat]').forEach(btn=>{
         btn.addEventListener('click', ()=> removeCategory(btn.getAttribute('data-remove-cat')));
+      });
+      list.querySelectorAll('button[data-move-cat]').forEach(btn=>{
+        btn.addEventListener('click', ()=> moveCategory(Number(btn.getAttribute('data-move-cat')), Number(btn.getAttribute('data-dir'))));
       });
     }
   }
@@ -2768,6 +2782,12 @@
     await loadSettings();
     renderCategoriesUI(); renderStore();
     return true;
+  }
+  async function moveCategory(i, dir){
+    const j = i + dir;
+    if(j < 0 || j >= categories.length) return;
+    [categories[i], categories[j]] = [categories[j], categories[i]];
+    if(await saveCategories()){ renderCarousel(); renderCategoryShowcase(); }
   }
   async function removeCategory(name){
     categories = categories.filter(c=>c!==name);
