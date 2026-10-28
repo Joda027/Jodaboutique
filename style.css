@@ -660,7 +660,6 @@
   /* ---------- FINANCES ---------- */
   .fin-form{ display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:10px; align-items:center; margin-bottom:14px;}
   @media (max-width:640px){ .fin-form{ grid-template-columns:1fr; } }
-  .report-box{ background:var(--bg-panel-2); border:1px solid var(--line); border-radius:6px; padding:20px; margin-top:16px; font-size:14px; line-height:1.65; white-space:pre-wrap;}
   .num-pos{ color:var(--navy); font-family:'Montserrat', sans-serif;}
   .num-neg{ color:var(--wine); font-family:'Montserrat', sans-serif;}
 
