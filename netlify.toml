@@ -13,3 +13,9 @@
   from = "/apercu.jpg"
   to = "/.netlify/functions/og-image"
   status = 200
+
+# Le logo change rarement : les navigateurs peuvent le garder une semaine.
+[[headers]]
+  for = "/logo.webp"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
