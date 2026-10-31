@@ -4,6 +4,14 @@
 [functions]
   directory = "netlify/functions"
 
+# Adresse officielle : jodaboutique.com. L'ancienne adresse Netlify y renvoie
+# définitivement (301), page par page. Cette règle doit rester la première.
+[[redirects]]
+  from = "https://jodaboutique.netlify.app/*"
+  to = "https://jodaboutique.com/:splat"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "/produit/*"
   to = "/.netlify/functions/product/:splat"
@@ -13,3 +21,9 @@
   from = "/apercu.jpg"
   to = "/.netlify/functions/og-image"
   status = 200
+
+# Le logo change rarement : les navigateurs peuvent le garder une semaine.
+[[headers]]
+  for = "/logo.webp"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

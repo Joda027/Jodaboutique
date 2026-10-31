@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Joda Boutique — Bijoux &amp; accessoires à Conakry</title>
 <meta name="description" content="Joda Boutique : Bijoux, sacs et accessoires tendance à Conakry, livrés partout en Guinée. Commande en ligne en 1 minute. Colliers, bracelets, boucles d'oreilles, bagues et sacs à commander en ligne.">
-<link rel="canonical" href="https://jodaboutique.netlify.app/">
+<link rel="canonical" href="https://jodaboutique.com/">
 
 <meta name="google-site-verification" content="EB8HZ5kjyEHUkS-DfUyQeYCZaxkaBXfnv5hFCyeWspw" />
 
@@ -13,13 +13,13 @@
 <meta property="og:site_name" content="Joda Boutique">
 <meta property="og:title" content="Joda Boutique — Bijoux &amp; accessoires à Conakry">
 <meta property="og:description" content="Bijoux, sacs et accessoires tendance à Conakry, livrés partout en Guinée. Commande en ligne en 1 minute.">
-<meta property="og:url" content="https://jodaboutique.netlify.app/">
-<meta property="og:image" content="https://jodaboutique.netlify.app/apercu.jpg">
+<meta property="og:url" content="https://jodaboutique.com/">
+<meta property="og:image" content="https://jodaboutique.com/apercu.jpg">
 <meta property="og:image:alt" content="Bijoux et sacs Joda Boutique">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Joda Boutique — Bijoux &amp; accessoires à Conakry">
 <meta name="twitter:description" content="Bijoux, sacs et accessoires tendance à Conakry, livrés partout en Guinée. Commande en ligne en 1 minute.">
-<meta name="twitter:image" content="https://jodaboutique.netlify.app/apercu.jpg">
+<meta name="twitter:image" content="https://jodaboutique.com/apercu.jpg">
 
 <link rel="icon" type="image/webp" href="logo.webp">
 <link rel="apple-touch-icon" href="logo.webp">
@@ -33,8 +33,8 @@
   "@type": "Store",
   "name": "Joda Boutique",
   "description": "Bijoux et accessoires de qualité à Conakry, Guinée.",
-  "url": "https://jodaboutique.netlify.app/",
-  "image": "https://jodaboutique.netlify.app/logo.webp",
+  "url": "https://jodaboutique.com/",
+  "image": "https://jodaboutique.com/logo.webp",
   "address": {
     "@type": "PostalAddress",
     "addressLocality": "Conakry",
@@ -363,12 +363,6 @@
           <p class="section-note" style="margin-bottom:12px;">Visites = ouvertures de la page. Clics = actions des visiteurs (j'aime, ajouts au panier).</p>
           <div id="trafficBars"></div>
         </div>
-        <div class="panel">
-          <h4>Rapport hebdomadaire</h4>
-          <p class="section-note" style="margin-bottom:12px;">Génère une analyse des 7 derniers jours : ventes, tendances et recommandations rapides.</p>
-          <button class="btn-primary" id="genWeeklyReportBtn">Générer le rapport de la semaine</button>
-          <div class="report-box" id="weeklyReportBox" style="display:none;"></div>
-        </div>
       </div>
 
       <div id="tab-finances" class="tab-content" style="display:none;">
@@ -432,12 +426,6 @@
             <tbody id="commissionsBody"></tbody>
           </table></div>
         </div>
-        <div class="panel">
-          <h4>Rapport mensuel — analyse globale</h4>
-          <p class="section-note" style="margin-bottom:12px;">Génère une analyse complète du mois : chiffre d'affaires, dépenses, bénéfice, ce qui a marché ou non, et des projections.</p>
-          <button class="btn-primary" id="genReportBtn">Générer le rapport du mois</button>
-          <div class="report-box" id="reportBox" style="display:none;"></div>
-        </div>
       </div>
 
       <div id="tab-mystats" class="tab-content" style="display:none;">
@@ -479,12 +467,6 @@
             <tbody id="myOrdersBody"></tbody>
           </table></div>
           <div class="status-msg" id="myOrdersEmpty" style="display:none;">Aucune commande prise en charge ce mois-ci.</div>
-        </div>
-        <div class="panel">
-          <h4>Mon rapport mensuel</h4>
-          <p class="section-note" style="margin-bottom:12px;">Résumé de votre activité du mois : ventes, commission, et conseils.</p>
-          <button class="btn-primary" id="genMyReportBtn">Générer mon rapport du mois</button>
-          <div class="report-box" id="myReportBox" style="display:none;"></div>
         </div>
       </div>
 
@@ -551,7 +533,7 @@
         </div>
         <div class="panel" style="max-width:520px;">
           <h4>Catégories du catalogue</h4>
-          <p class="section-note" style="margin-bottom:12px;">Créez les catégories qui regrouperont vos produits sur la boutique (ex: Colliers, Bracelets, Sacs). Sur la page d'accueil, la collection est présentée par catégorie : les clients cliquent sur une catégorie pour voir les pièces qu'elle contient.</p>
+          <p class="section-note" style="margin-bottom:12px;">Créez les catégories qui regrouperont vos produits sur la boutique (ex: Colliers, Bracelets, Sacs). Sur la page d'accueil, la collection est présentée par catégorie : les clients cliquent sur une catégorie pour voir les pièces qu'elle contient. Utilisez ↑ ↓ pour choisir l'ordre : les 3 premières sont mises en avant à côté de la grande bannière et dans la phrase d'accueil.</p>
           <div class="form-row" style="grid-template-columns:1fr auto;">
             <input class="text-input" style="margin:0;" id="newCategoryInput" placeholder="Nom de la catégorie">
             <button class="btn-mini" id="addCategoryBtn" style="height:38px;">Ajouter</button>
@@ -762,20 +744,9 @@
 </div>
 
 <!-- CHATBOT -->
-<button class="chat-fab" id="chatFab" title="Besoin d'aide ?">💬</button>
-<div class="chat-panel" id="chatPanel">
-  <div class="chat-head">
-    <span>Joda vous répond</span>
-    <button id="chatClose">×</button>
-  </div>
-  <div class="chat-body" id="chatBody">
-    <div class="chat-msg bot">Bonjour ! Je suis l'assistante de Joda Boutique. Je peux vous renseigner sur nos bijoux, les prix, les stocks ou comment commander. Que cherchez-vous ?</div>
-  </div>
-  <div class="chat-input-row">
-    <input class="text-input" id="chatInput" placeholder="Écrivez votre question…">
-    <button id="chatSend">Envoyer</button>
-  </div>
-</div>
+<a class="wa-fab" id="waFab" href="#" target="_blank" rel="noopener" style="display:none;" aria-label="Nous écrire sur WhatsApp" title="Nous écrire sur WhatsApp">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.4-.1-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.1 4.9 4.3.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2a8.2 8.2 0 01-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2z"/></svg>
+</a>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>

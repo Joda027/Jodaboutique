@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = 'https://sfkxhelutkoqinmfceyc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HQc7xFR0jmCbFXXqhOFDhw_fjZ-x07V';
-const SITE_URL = 'https://jodaboutique.netlify.app';
+const SITE_URL = 'https://jodaboutique.com';
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -28,7 +28,7 @@ exports.handler = async (event) => {
 
   const title = product ? `${product.name} — Joda Boutique` : 'Joda Boutique — Bijoux & accessoires à Conakry';
   const description = product
-    ? `${product.name} à ${Number(product.price).toLocaleString('fr-FR')} GNF. Bijoux et accessoires à Conakry, Guinée.`
+    ? `${product.name} à ${Number(product.price).toLocaleString('fr-FR')} GNF chez Joda Boutique, Conakry. Livraison partout en Guinée.`
     : "Bijoux et accessoires de qualité à Conakry, Guinée. Colliers, bracelets, boucles d'oreilles, bagues et sacs à commander en ligne.";
   const image = (product && product.image && /^https?:\/\//.test(product.image)) ? product.image : `${SITE_URL}/apercu.jpg`;
   const redirectUrl = product ? `${SITE_URL}/?p=${encodeURIComponent(product.id)}` : SITE_URL;

@@ -6,10 +6,10 @@
 //   OM_CURRENCY               GNF en production (OUV dans l'environnement de test Orange)
 //   OM_TOKEN_URL              optionnel, défaut https://api.orange.com/oauth/v3/token
 //   SUPABASE_SERVICE_ROLE_KEY clé « service_role » Supabase (pour mettre à jour la commande)
-//   SITE_URL                  optionnel, défaut https://jodaboutique.netlify.app
+//   SITE_URL                  optionnel, défaut https://jodaboutique.com
 
 const SUPABASE_URL = 'https://sfkxhelutkoqinmfceyc.supabase.co';
-const SITE_URL = (process.env.SITE_URL || 'https://jodaboutique.netlify.app').replace(/\/$/, '');
+const SITE_URL = (process.env.SITE_URL || 'https://jodaboutique.com').replace(/\/$/, '');
 const OM_API_BASE = 'https://api.orange.com/';
 
 function isConfigured(){

@@ -5,7 +5,7 @@
 //   3. sinon le logo.
 const SUPABASE_URL = 'https://sfkxhelutkoqinmfceyc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HQc7xFR0jmCbFXXqhOFDhw_fjZ-x07V';
-const SITE_URL = 'https://jodaboutique.netlify.app';
+const SITE_URL = 'https://jodaboutique.com';
 
 async function rest(path){
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
