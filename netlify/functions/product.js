@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = 'https://sfkxhelutkoqinmfceyc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_HQc7xFR0jmCbFXXqhOFDhw_fjZ-x07V';
-const SITE_URL = 'https://jodaboutique.netlify.app';
+const SITE_URL = 'https://jodaboutique.com';
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
