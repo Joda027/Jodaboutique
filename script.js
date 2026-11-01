@@ -1036,7 +1036,7 @@
       <h3>${escapeHtml(p.name)}</h3>
       ${swatches}
       <div class="price-row ${promoActive()?'promo':''}">${priceHtml}</div>
-      <div class="stock ${low?'low':''} ${outOfStock?'out':''}">${outOfStock ? 'Épuisé' : stockNum + ' en stock'}</div>
+      <div class="stock ${low?'low':''} ${outOfStock?'out':''}">${outOfStock ? 'Épuisé' : (low ? 'Plus que '+stockNum+' pièce'+(stockNum>1?'s':'')+' !' : 'Disponible')}</div>
       <button class="add" data-id="${p.id}" ${activeVariant?`data-variant-id="${activeVariant.id}"`:''} ${outOfStock?'disabled':''}>${outOfStock?'Indisponible':'Ajouter au panier'}</button>
     </div>`;
   }
@@ -1168,7 +1168,6 @@
   function renderStore(){
     const grid = document.getElementById('productGrid');
     const visible = products.filter(isApproved);
-    document.getElementById('heroStockCount').textContent = visible.reduce((s,p)=>s+Number(p.stock||0),0);
     const groups = groupByCategory(visible);
     if(activeCat && activeCat !== '__promo' && !groups.some(g=>g.name===activeCat)) activeCat = '';
     if(activeCat === '__promo' && !promoActive()) activeCat = '';
