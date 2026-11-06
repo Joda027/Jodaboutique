@@ -2210,6 +2210,7 @@
 
   // Modification d'une dépense ou d'une vente hors site, directement dans la ligne du tableau.
   let editing = null;
+  let listMonth = null; // mois affiché dans les tableaux des dépenses et des ventes hors site (clé AAAA-MM)
   function isoDay(ts){
     const d = new Date(ts);
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -2243,6 +2244,7 @@
     if(error){ if(msg) msg.textContent = 'Erreur : '+error.message; return; }
     await logActivity(currentUser.name, 'a modifié '+(e.kind==='exp'?'une dépense':'une vente hors site')+' : '+label+' ('+money(amount)+')');
     editing = null;
+    listMonth = monthKey(patch.ts || orig.ts); // on suit la ligne si sa date change de mois
     if(e.kind==='exp') await loadExpenses(); else await loadOfflineSales();
     renderFinancesTab(); renderStatsTab();
   }
@@ -2279,9 +2281,26 @@
         <td style="color:var(--wine);font-weight:600;">${money(r.net)}</td>
       </tr>`).join('') || '<tr><td colspan="5">Aucune assistante.</td></tr>';
 
+    // Mois affiché dans les tableaux : le mois en cours par défaut, ou un mois passé choisi dans la liste.
+    const curKey = monthKey(Date.now());
+    const monthKeys = [...new Set([curKey, ...expenses.map(e=>monthKey(e.ts)), ...offlineSales.map(o=>monthKey(o.ts))])].sort().reverse();
+    if(!listMonth || !monthKeys.includes(listMonth)) listMonth = curKey;
+    const monthOptions = monthKeys.map(k=>{
+      const [y,m] = k.split('-').map(Number);
+      return `<option value="${k}" ${k===listMonth?'selected':''}>${monthLabel(new Date(y, m-1, 15))}${k===curKey?' (en cours)':''}</option>`;
+    }).join('');
+    ['expMonthSel','offMonthSel'].forEach(id=>{
+      const sel = document.getElementById(id);
+      sel.innerHTML = monthOptions;
+      sel.onchange = ()=>{ listMonth = sel.value; editing = null; renderFinancesTab(); };
+    });
+    document.getElementById('expMonthNote').textContent = listMonth===curKey ? '' : 'Mois passé : le bilan ci-dessus reste celui du mois en cours.';
+    const listExpenses = expenses.filter(e=> e.ts && monthKey(e.ts)===listMonth).sort((a,b)=>a.ts-b.ts);
+    const listOffline = offlineSales.filter(o=> o.ts && monthKey(o.ts)===listMonth).sort((a,b)=>a.ts-b.ts);
+
     const body = document.getElementById('expensesBody');
-    document.getElementById('expEmpty').style.display = f.monthExpenses.length ? 'none' : 'block';
-    body.innerHTML = f.monthExpenses.map(e=>{
+    document.getElementById('expEmpty').style.display = listExpenses.length ? 'none' : 'block';
+    body.innerHTML = listExpenses.map(e=>{
       if(editing && editing.kind==='exp' && editing.id===e.id){
         return `<tr class="row-edit">
         <td><input type="date" class="text-input" data-edit="date" value="${editing.date}"></td>
@@ -2319,8 +2338,8 @@
     });
 
     const offBody = document.getElementById('offSalesBody');
-    document.getElementById('offSalesEmpty').style.display = f.monthOffline.length ? 'none' : 'block';
-    offBody.innerHTML = f.monthOffline.map(o=>{
+    document.getElementById('offSalesEmpty').style.display = listOffline.length ? 'none' : 'block';
+    offBody.innerHTML = listOffline.map(o=>{
       if(editing && editing.kind==='off' && editing.id===o.id){
         return `<tr class="row-edit">
         <td><input type="date" class="text-input" data-edit="date" value="${editing.date}"></td>
