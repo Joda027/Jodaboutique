@@ -2208,6 +2208,44 @@
       || '<tr><td colspan="5">Aucune assistante.</td></tr>';
   }
 
+  // Modification d'une dépense ou d'une vente hors site, directement dans la ligne du tableau.
+  let editing = null;
+  function isoDay(ts){
+    const d = new Date(ts);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function wireEditRow(root){
+    const row = root.querySelector('tr.row-edit');
+    if(!row || !editing) return;
+    row.querySelectorAll('[data-edit]').forEach(inp=>{
+      const sync = ()=>{ editing[inp.dataset.edit] = inp.value; };
+      inp.addEventListener('input', sync); inp.addEventListener('change', sync);
+    });
+    row.querySelector('[data-edit-cancel]').addEventListener('click', ()=>{ editing = null; renderFinancesTab(); });
+    row.querySelector('[data-edit-save]').addEventListener('click', saveEdit);
+  }
+  async function saveEdit(){
+    if(!editing) return;
+    const e = editing;
+    const label = String(e.label||'').trim();
+    const amount = Number(e.amount);
+    const msg = document.querySelector('tr.row-edit [data-edit-msg]');
+    if(!label || !amount || amount<0 || !/^\d{4}-\d{2}-\d{2}$/.test(e.date||'')){ if(msg) msg.textContent = 'Renseignez une description, un montant et une date.'; return; }
+    const table = e.kind==='exp' ? 'expenses' : 'offline_sales';
+    const list = e.kind==='exp' ? expenses : offlineSales;
+    const orig = list.find(x=>x.id===e.id);
+    if(!orig){ editing = null; renderFinancesTab(); return; }
+    const patch = {label, amount};
+    if(e.kind==='exp') patch.type = e.type==='achat' ? 'achat' : 'dépense';
+    // La date ne change que si elle a été modifiée (l'heure d'origine est conservée sinon).
+    if(e.date !== isoDay(orig.ts)){ const [y,m,d] = e.date.split('-').map(Number); patch.ts = new Date(y, m-1, d, 12, 0, 0).getTime(); }
+    const { error } = await sb.from(table).update(patch).eq('id', e.id);
+    if(error){ if(msg) msg.textContent = 'Erreur : '+error.message; return; }
+    await logActivity(currentUser.name, 'a modifié '+(e.kind==='exp'?'une dépense':'une vente hors site')+' : '+label+' ('+money(amount)+')');
+    editing = null;
+    if(e.kind==='exp') await loadExpenses(); else await loadOfflineSales();
+    renderFinancesTab(); renderStatsTab();
+  }
   function renderFinancesTab(){
     renderCumulPanel();
     const f = monthFinancials(Date.now());
@@ -2243,14 +2281,35 @@
 
     const body = document.getElementById('expensesBody');
     document.getElementById('expEmpty').style.display = f.monthExpenses.length ? 'none' : 'block';
-    body.innerHTML = f.monthExpenses.map(e=>`
+    body.innerHTML = f.monthExpenses.map(e=>{
+      if(editing && editing.kind==='exp' && editing.id===e.id){
+        return `<tr class="row-edit">
+        <td><input type="date" class="text-input" data-edit="date" value="${editing.date}"></td>
+        <td><input class="text-input" data-edit="label" value="${escapeHtml(editing.label)}"></td>
+        <td><select class="text-input" data-edit="type">
+          <option value="achat" ${editing.type==='achat'?'selected':''}>achat</option>
+          <option value="dépense" ${editing.type!=='achat'?'selected':''}>dépense</option></select></td>
+        <td><input type="number" class="text-input" data-edit="amount" value="${escapeHtml(editing.amount)}"></td>
+        <td><button class="btn-mini" data-edit-save="1">Enregistrer</button><button class="btn-mini" data-edit-cancel="1">Annuler</button><div class="section-note" data-edit-msg="1"></div></td>
+      </tr>`;
+      }
+      return `
       <tr>
         <td>${new Date(e.ts).toLocaleDateString('fr-FR')}</td>
         <td>${escapeHtml(e.label)}</td>
         <td>${escapeHtml(e.type)}</td>
         <td>${money(e.amount)}</td>
-        <td><button class="btn-mini danger" data-exp="${e.id}">Retirer</button></td>
-      </tr>`).join('');
+        <td><button class="btn-mini" data-exp-edit="${e.id}">Modifier</button><button class="btn-mini danger" data-exp="${e.id}">Retirer</button></td>
+      </tr>`;
+    }).join('');
+    wireEditRow(body);
+    body.querySelectorAll('button[data-exp-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const e = expenses.find(x=>x.id===btn.dataset.expEdit); if(!e) return;
+        editing = {kind:'exp', id:e.id, date:isoDay(e.ts), label:e.label, amount:String(e.amount), type:e.type};
+        renderFinancesTab();
+      });
+    });
     body.querySelectorAll('button[data-exp]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         await sb.from('expenses').delete().eq('id', btn.dataset.exp);
@@ -2261,13 +2320,31 @@
 
     const offBody = document.getElementById('offSalesBody');
     document.getElementById('offSalesEmpty').style.display = f.monthOffline.length ? 'none' : 'block';
-    offBody.innerHTML = f.monthOffline.map(o=>`
+    offBody.innerHTML = f.monthOffline.map(o=>{
+      if(editing && editing.kind==='off' && editing.id===o.id){
+        return `<tr class="row-edit">
+        <td><input type="date" class="text-input" data-edit="date" value="${editing.date}"></td>
+        <td><input class="text-input" data-edit="label" value="${escapeHtml(editing.label)}"></td>
+        <td><input type="number" class="text-input" data-edit="amount" value="${escapeHtml(editing.amount)}"></td>
+        <td><button class="btn-mini" data-edit-save="1">Enregistrer</button><button class="btn-mini" data-edit-cancel="1">Annuler</button><div class="section-note" data-edit-msg="1"></div></td>
+      </tr>`;
+      }
+      return `
       <tr>
         <td>${new Date(o.ts).toLocaleDateString('fr-FR')}</td>
         <td>${escapeHtml(o.label)}</td>
         <td>${money(o.amount)}</td>
-        <td><button class="btn-mini danger" data-off="${o.id}">Retirer</button></td>
-      </tr>`).join('');
+        <td><button class="btn-mini" data-off-edit="${o.id}">Modifier</button><button class="btn-mini danger" data-off="${o.id}">Retirer</button></td>
+      </tr>`;
+    }).join('');
+    wireEditRow(offBody);
+    offBody.querySelectorAll('button[data-off-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const o = offlineSales.find(x=>x.id===btn.dataset.offEdit); if(!o) return;
+        editing = {kind:'off', id:o.id, date:isoDay(o.ts), label:o.label, amount:String(o.amount)};
+        renderFinancesTab();
+      });
+    });
     offBody.querySelectorAll('button[data-off]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         await sb.from('offline_sales').delete().eq('id', btn.dataset.off);
