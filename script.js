@@ -1004,6 +1004,12 @@
 
   /* ---------- STORE RENDER ---------- */
   function isApproved(p){ return p.approved === true; }
+  // Une pièce épuisée (toutes ses couleurs/tailles à zéro) n'est pas montrée aux visiteurs ; elle reste visible dans l'espace équipe.
+  function isAvailable(p){
+    const pv = variantsFor(p.id);
+    return pv.length ? pv.some(v=>Number(v.stock) > 0) : Number(p.stock) > 0;
+  }
+  function isListed(p){ return isApproved(p) && isAvailable(p); }
   function productCardHtml(p, i){
     const pVariants = variantsFor(p.id);
     let activeVariant = null;
@@ -1167,7 +1173,7 @@
 
   function renderStore(){
     const grid = document.getElementById('productGrid');
-    const visible = products.filter(isApproved);
+    const visible = products.filter(isListed);
     const groups = groupByCategory(visible);
     if(activeCat && activeCat !== '__promo' && !groups.some(g=>g.name===activeCat)) activeCat = '';
     if(activeCat === '__promo' && !promoActive()) activeCat = '';
@@ -1184,7 +1190,7 @@
       (searchActive || activeCat) ? (filtered.length + ' pièce' + (filtered.length>1?'s':'')) : (visible.length + ' pièces disponibles');
 
     if(visible.length === 0){
-      grid.innerHTML = '<div class="loading">Aucune pièce pour le moment. Ajoutez-en depuis l\'espace équipe.</div>';
+      grid.innerHTML = '<div class="loading">Aucune pièce disponible pour le moment. Revenez bientôt !</div>';
       return;
     }
     grid.innerHTML = filtered.length
@@ -1259,7 +1265,7 @@
 
   /* ---------- VITRINE DES CATÉGORIES (colonne de droite, cercles, bannières, bandeau de confiance) ---------- */
   function renderCategoryShowcase(){
-    const groups = groupByCategory(products.filter(isApproved));
+    const groups = groupByCategory(products.filter(isListed));
     const promo = promoActive();
     const tones = ['navy','wine','ink'];
     const card = (g, i, cls)=>`
@@ -1316,7 +1322,7 @@
   let carouselItems = [];
   function buildCarouselItems(){
     const items = [];
-    products.filter(isApproved).forEach(p=>{
+    products.filter(isListed).forEach(p=>{
       const pVariants = variantsFor(p.id);
       if(pVariants.length){
         pVariants.forEach(v=>{
@@ -1337,7 +1343,7 @@
   ];
   // Phrase d'accroche construite à partir des catégories publiées (les 3 premières).
   function heroLead(){
-    const names = groupByCategory(products.filter(isApproved)).map(g=>g.name).filter(n=>n && n!=='Autre').slice(0,3);
+    const names = groupByCategory(products.filter(isListed)).map(g=>g.name).filter(n=>n && n!=='Autre').slice(0,3);
     if(!names.length) return 'Bijoux, sacs et accessoires';
     const list = names.map((n,i)=> i ? n.toLowerCase() : n);
     return list.length>1 ? list.slice(0,-1).join(', ')+' et '+list[list.length-1] : list[0];
