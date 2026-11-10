@@ -805,3 +805,10 @@
   .admin-table tr.row-edit .text-input{ margin:0; padding:7px 8px; font-size:13px; min-width:90px; }
   .month-pick{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:14px 0 4px; font-size:13px; color:var(--muted); }
   .month-pick select{ margin:0; width:auto; min-width:190px; }
+  .stock-alert{ border-color:#e3b3b9; background:#fff8f8; margin-bottom:18px; }
+  .stock-alert h4{ color:var(--wine); }
+  .sa-group{ margin-top:10px; }
+  .sa-title{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:6px; }
+  .sa-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:7px 0; border-top:1px solid var(--line); font-size:13.5px; }
+  .sa-row .sa-name{ flex:1; min-width:160px; font-weight:600; }
+  .sa-row .btn-mini{ margin-right:0; }

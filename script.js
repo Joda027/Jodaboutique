@@ -1808,7 +1808,7 @@
 
     const tabs = tabsForRole(currentUser.role);
     const tabsEl = document.getElementById('adminTabs');
-    tabsEl.innerHTML = tabs.map((t,i)=>`<button class="admin-tab ${i===0?'active':''}" data-tab="${t.key}">${t.label}${t.key==='commandes' ? '<span class="tab-badge" id="commandesBadge" style="display:none;"></span>' : ''}</button>`).join('');
+    tabsEl.innerHTML = tabs.map((t,i)=>`<button class="admin-tab ${i===0?'active':''}" data-tab="${t.key}">${t.label}${t.key==='commandes' ? '<span class="tab-badge" id="commandesBadge" style="display:none;"></span>' : ''}${t.key==='overview' ? '<span class="tab-badge" id="stockBadge" style="display:none;" title="Pièces épuisées à réapprovisionner"></span>' : ''}</button>`).join('');
     ['overview','stats','finances','produits','commandes','equipe','monprofil','mystats','reglages'].forEach(k=>{
       document.getElementById('tab-'+k).style.display = (tabs[0].key===k) ? '' : 'none';
     });
@@ -1834,7 +1834,91 @@
     else { renderMyProfileTab(); renderMyStatsTab(); }
   }
 
+  /* ---------- ALERTES DE STOCK (administratrice) ---------- */
+  const LOW_STOCK = 3;
+  // Pièces publiées épuisées (out) ou presque (low). Pour une pièce à couleurs/tailles : soit toute la pièce est épuisée, soit on signale chaque couleur/taille concernée.
+  function stockAlerts(){
+    const out = [], low = [];
+    products.filter(isApproved).forEach(p=>{
+      const pv = variantsFor(p.id);
+      if(!pv.length){
+        const n = Number(p.stock);
+        if(n<=0) out.push({pid:p.id, vid:null, label:p.name, stock:0});
+        else if(n<=LOW_STOCK) low.push({pid:p.id, vid:null, label:p.name, stock:n});
+      } else if(!pv.some(v=>Number(v.stock)>0)){
+        out.push({pid:p.id, vid:null, label:p.name, note:'toutes les couleurs/tailles', stock:0});
+      } else {
+        pv.forEach(v=>{
+          const n = Number(v.stock);
+          const e = {pid:p.id, vid:v.id, label:p.name+' — '+v.color, stock:n};
+          if(n<=0) out.push(e); else if(n<=LOW_STOCK) low.push(e);
+        });
+      }
+    });
+    return {out, low};
+  }
+  function renderStockAlerts(){
+    const panel = document.getElementById('stockAlertPanel');
+    const badge = document.getElementById('stockBadge');
+    const {out, low} = stockAlerts();
+    if(badge){ badge.textContent = String(out.length); badge.style.display = out.length ? 'inline-flex' : 'none'; }
+    if(!panel) return;
+    if(!out.length && !low.length){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
+    const row = (e, kind)=>`<div class="sa-row">
+      <span class="sa-name">${escapeHtml(e.label)}${e.note ? `<span class="section-note"> (${e.note})</span>` : ''}</span>
+      <span class="pill ${kind==='out'?'new':'progress'}">${kind==='out' ? 'épuisé' : 'plus que '+e.stock}</span>
+      <button class="btn-mini" data-sa-restock="${e.pid}" data-sa-vid="${e.vid||''}">+ stock</button>
+      <button class="btn-mini" data-sa-open="${e.pid}">Voir la fiche</button>
+    </div>`;
+    panel.style.display = '';
+    panel.innerHTML = `
+      <h4>⚠ Stock à surveiller</h4>
+      <p class="section-note" style="margin-bottom:12px;">Les pièces épuisées ne sont plus affichées aux visiteurs. Réapprovisionnez-les, ou retirez-les du catalogue si vous ne les reprenez pas.</p>
+      ${out.length ? `<div class="sa-group"><div class="sa-title">À réapprovisionner ou à retirer (${out.length})</div>${out.map(e=>row(e,'out')).join('')}</div>` : ''}
+      ${low.length ? `<div class="sa-group"><div class="sa-title">Bientôt épuisées (${low.length})</div>${low.map(e=>row(e,'low')).join('')}</div>` : ''}`;
+    panel.querySelectorAll('button[data-sa-restock]').forEach(btn=>{
+      btn.addEventListener('click', ()=> restockFromAlert(btn.dataset.saRestock, btn.dataset.saVid || null));
+    });
+    panel.querySelectorAll('button[data-sa-open]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        expandedVariantIds.add(btn.dataset.saOpen);
+        renderProductsTab();
+        const tab = document.querySelector('#adminTabs .admin-tab[data-tab="produits"]');
+        if(tab) tab.click();
+        const row = document.getElementById('variantDetail-'+btn.dataset.saOpen);
+        const target = row ? row.previousElementSibling : null;
+        if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    });
+  }
+  // Même logique que les boutons « + stock » de l'onglet Produits, depuis le panneau d'alerte.
+  async function restockFromAlert(pid, vid){
+    const p = products.find(x=>x.id===pid); if(!p) return;
+    if(vid){
+      const v = variants.find(x=>x.id===vid); if(!v) return;
+      const add = prompt('Combien de pièces ajouter au stock de "'+p.name+' — '+v.color+'" ?', '5');
+      if(add===null) return;
+      const n = Number(add)||0;
+      const newV = Math.max(0, Number(v.stock) + n);
+      const delta = newV - Number(v.stock);
+      await sb.from('product_variants').update({stock:newV}).eq('id', v.id);
+      await sb.from('products').update({stock: Math.max(0, Number(p.stock) + delta)}).eq('id', p.id);
+      await logActivity(currentUser.name, 'a réapprovisionné "'+p.name+' — '+v.color+'" (+'+n+')');
+    } else {
+      const pv = variantsFor(p.id);
+      if(pv.length){ alert('Cette pièce a des couleurs/tailles : ouvrez sa fiche pour réapprovisionner chacune.'); return; }
+      const add = prompt('Combien de pièces ajouter au stock de "'+p.name+'" ?', '5');
+      if(add===null) return;
+      const n = Number(add)||0;
+      await sb.from('products').update({stock: Number(p.stock) + n}).eq('id', p.id);
+      await logActivity(currentUser.name, 'a réapprovisionné "'+p.name+'" (+'+n+')');
+    }
+    await Promise.all([loadProducts(), loadVariants()]);
+    renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase(); renderOverview();
+  }
+
   function renderOverview(){
+    renderStockAlerts();
     const statGrid = document.getElementById('statGrid');
     const nouvelles = orders.filter(o=>o.status==='nouvelle').length;
     const enCours = orders.filter(o=>o.status==='en cours').length;
@@ -2548,7 +2632,7 @@
           expandedVariantIds.add(pid);
         }
         await Promise.all([loadProducts(), loadVariants()]);
-        renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase();
+        renderProductsTab(); renderStore(); renderCarousel(); renderCategoryShowcase(); if(currentUser.role==='admin') renderOverview();
       });
     });
     body.querySelectorAll('button[data-act]').forEach(btn=>{
